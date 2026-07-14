@@ -22,14 +22,16 @@ class AboutActivity : AppCompatActivity() {
         // 1) Affiche d'abord le statut connu localement (rapide, fonctionne hors-ligne).
         updateStatusText(binding, TrialManager.isLicensed(this))
 
-        // 2) Si pas encore licencié localement, vérifie en ligne (Firebase) au cas où
-        //    l'admin aurait activé la clé depuis le dernier lancement de l'app.
-        if (!TrialManager.isLicensed(this)) {
-            binding.tvLicenseStatus.text = "Statut : Vérification de la licence..."
-            lifecycleScope.launch {
-                val active = TrialManager.checkOnlineLicense(this@AboutActivity)
-                updateStatusText(binding, active)
-            }
+        // 2) Vérifie systématiquement en ligne (Firebase), même si l'app se
+        //    croit déjà licenciée localement : sinon, si l'admin change la
+        //    durée (renouvellement, correction, etc.) après une première
+        //    activation, l'app reste bloquée sur l'ancienne valeur mise en
+        //    cache jusqu'à son expiration locale et ne revoit jamais la
+        //    nouvelle durée tant qu'elle n'a pas expiré côté téléphone.
+        binding.tvLicenseStatus.text = "Statut : Vérification de la licence..."
+        lifecycleScope.launch {
+            val active = TrialManager.checkOnlineLicense(this@AboutActivity)
+            updateStatusText(binding, active)
         }
 
         // Se met à jour chaque minute tant que l'écran est affiché, pour rester

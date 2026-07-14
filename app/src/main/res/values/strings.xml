@@ -3,6 +3,11 @@
     <string name="app_name">SolPlay</string>
     <string name="tagline">Votre lecteur IPTV nouvelle génération</string>
 
+    <string name="update_available_title">Nouvelle version disponible</string>
+    <string name="update_available_message">La version %1$s de SolPlay est disponible. Voulez-vous la télécharger maintenant ?</string>
+    <string name="update_download">Télécharger</string>
+    <string name="update_later">Plus tard</string>
+
     <string name="contact_email">stephanegue2018@gmail.com</string>
     <string name="contact_phone">+225 05 03 06 69 12</string>
 

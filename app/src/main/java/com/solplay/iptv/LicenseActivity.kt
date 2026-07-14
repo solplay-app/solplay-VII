@@ -28,6 +28,15 @@ class LicenseActivity : AppCompatActivity() {
 
         refreshUiState()
 
+        // Revérifie automatiquement auprès de Firebase à l'ouverture de l'écran
+        // (en plus du bouton "Vérifier mon activation"), pour refléter tout
+        // changement fait côté admin (nouvelle durée, renouvellement...)
+        // sans attendre l'expiration de la valeur mise en cache localement.
+        lifecycleScope.launch {
+            TrialManager.checkOnlineLicense(this@LicenseActivity)
+            refreshUiState()
+        }
+
         // Se met à jour chaque minute tant que l'écran est affiché, au lieu de
         // rester figé sur la valeur calculée à l'ouverture de l'écran.
         LiveCountdown.attach(this) { refreshUiState() }
