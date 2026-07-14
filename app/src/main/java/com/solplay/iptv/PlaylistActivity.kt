@@ -40,7 +40,7 @@ class PlaylistActivity : AppCompatActivity() {
         } else {
             binding.tvTrialBanner.text = getString(
                 R.string.trial_active_format,
-                TrialManager.getRemainingTrialDays(this)
+                TrialManager.formatDuration(TrialManager.getRemainingTrialMillis(this))
             )
         }
 
