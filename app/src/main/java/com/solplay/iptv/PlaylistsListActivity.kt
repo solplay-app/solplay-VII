@@ -100,7 +100,8 @@ class PlaylistsListActivity : AppCompatActivity() {
         Toast.makeText(this, "Connexion à « ${playlist.name} »…", Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
             try {
-                val channels = withContext(Dispatchers.IO) { M3uParser.fetchAndParse(playlist.buildUrl()) }
+                val parsed = withContext(Dispatchers.IO) { M3uParser.fetchAndParse(playlist.buildUrl()) }
+                val channels = XtreamApiClient.enrichChannelsWithCategories(playlist, parsed)
                 if (channels.isEmpty()) {
                     Toast.makeText(
                         this@PlaylistsListActivity,

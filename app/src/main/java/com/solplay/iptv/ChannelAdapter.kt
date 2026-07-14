@@ -1,11 +1,14 @@
 package com.solplay.iptv
 
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
+import coil.request.ErrorResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelChildren
@@ -44,10 +47,11 @@ class ChannelAdapter(
         return ChannelViewHolder(view)
     }
 
-    // ⚠️ MODE DEBUG TEMPORAIRE : affiche le statut TMDB (OK / erreur / etc.)
-    // à la place du group-title, pour diagnostiquer sans accès à Logcat/adb.
-    // Remettre à false une fois le problème identifié et corrigé.
-    private val showTmdbDebug = true
+    // ⚠️ MODE DEBUG : passer à true pour afficher le statut TMDB (OK / erreur
+    // / etc.) à la place du group-title, utile pour diagnostiquer sans accès
+    // à Logcat/adb. Remis à false : le vrai bug (Picasso + downloader obsolète
+    // qui ne chargeait jamais l'image réelle) est corrigé, voir ImageLoader.kt.
+    private val showTmdbDebug = false
 
     override fun onBindViewHolder(holder: ChannelViewHolder, position: Int) {
         val channel = channels[position]
@@ -62,17 +66,18 @@ class ChannelAdapter(
         if (!channel.logoUrl.isNullOrEmpty()) {
             // Logo fourni par le M3U : on l'essaie d'abord, mais beaucoup de
             // playlists IPTV mettent un tvg-logo générique ou cassé sur les
-            // films/séries. Si le chargement échoue (onError), on bascule
-            // sur TMDB au lieu de rester sur l'icône par défaut.
-            ImageLoader.get(holder.itemView.context).load(channel.logoUrl)
-                .placeholder(R.drawable.ic_channel_placeholder)
-                .error(R.drawable.ic_channel_placeholder)
-                .into(holder.logo, object : com.squareup.picasso.Callback {
-                    override fun onSuccess() {}
-                    override fun onError(e: Exception?) {
+            // films/séries. Si le chargement échoue, on bascule sur TMDB au
+            // lieu de rester sur l'icône par défaut.
+            holder.logo.load(channel.logoUrl, ImageLoader.get(holder.itemView.context)) {
+                placeholder(R.drawable.ic_channel_placeholder)
+                error(R.drawable.ic_channel_placeholder)
+                listener(
+                    onError = { _, result ->
+                        Log.w("ChannelAdapter", "Échec logo M3U '${channel.logoUrl}': ${result.throwable.message}")
                         loadTmdbFallback(holder, channel)
                     }
-                })
+                )
+            }
         } else {
             holder.logo.setImageResource(R.drawable.ic_channel_placeholder)
             loadTmdbFallback(holder, channel)
@@ -103,10 +108,15 @@ class ChannelAdapter(
 
             val posterUrl = result.info?.posterUrl
             if (!posterUrl.isNullOrEmpty()) {
-                ImageLoader.get(holder.itemView.context).load(posterUrl)
-                    .placeholder(R.drawable.ic_channel_placeholder)
-                    .error(R.drawable.ic_channel_placeholder)
-                    .into(holder.logo)
+                holder.logo.load(posterUrl, ImageLoader.get(holder.itemView.context)) {
+                    placeholder(R.drawable.ic_channel_placeholder)
+                    error(R.drawable.ic_channel_placeholder)
+                    listener(
+                        onError = { _, errorResult ->
+                            Log.w("ChannelAdapter", "Échec affiche TMDB '$posterUrl': ${errorResult.throwable.message}")
+                        }
+                    )
+                }
             }
         }
     }

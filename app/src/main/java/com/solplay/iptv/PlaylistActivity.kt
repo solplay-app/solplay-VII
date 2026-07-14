@@ -150,7 +150,8 @@ class PlaylistActivity : AppCompatActivity() {
         binding.progressBar.visibility = android.view.View.VISIBLE
         lifecycleScope.launch {
             try {
-                val channels = withContext(Dispatchers.IO) { M3uParser.fetchAndParse(playlist.buildUrl()) }
+                val parsed = withContext(Dispatchers.IO) { M3uParser.fetchAndParse(playlist.buildUrl()) }
+                val channels = XtreamApiClient.enrichChannelsWithCategories(playlist, parsed)
                 binding.progressBar.visibility = android.view.View.GONE
                 if (channels.isEmpty()) {
                     Toast.makeText(this@PlaylistActivity, "Aucune chaîne trouvée. Vérifiez vos identifiants/lien.", Toast.LENGTH_LONG).show()
