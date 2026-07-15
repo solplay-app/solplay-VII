@@ -34,7 +34,10 @@ class ChannelsActivity : AppCompatActivity() {
 
         allChannels = ChannelRepository.channels
 
-        channelAdapter = ChannelAdapter(emptyList()) { channel -> openPlayer(channel) }
+        val activePlaylist = PlaylistStore.getActiveId(this)
+            ?.let { id -> PlaylistStore.getAll(this).firstOrNull { it.id == id } }
+
+        channelAdapter = ChannelAdapter(emptyList(), epgPlaylist = activePlaylist) { channel -> openPlayer(channel) }
         binding.recyclerChannels.layoutManager = LinearLayoutManager(this)
         binding.recyclerChannels.adapter = channelAdapter
 

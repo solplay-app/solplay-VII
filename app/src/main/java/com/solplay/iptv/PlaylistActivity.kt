@@ -148,11 +148,18 @@ class PlaylistActivity : AppCompatActivity() {
 
     private fun loadPlaylist(playlist: SavedPlaylist) {
         binding.progressBar.visibility = android.view.View.VISIBLE
+        binding.tvLoadingStatus.visibility = android.view.View.VISIBLE
+        binding.btnLoadPlaylist.isEnabled = false
+        binding.tvLoadingStatus.text =
+            "Connexion au serveur…\nCela peut prendre du temps sur les grosses playlists, merci de patienter."
         lifecycleScope.launch {
             try {
                 val parsed = withContext(Dispatchers.IO) { M3uParser.fetchAndParse(playlist.buildUrl()) }
+                binding.tvLoadingStatus.text = "${parsed.size} chaînes trouvées, classement en catégories…"
                 val channels = XtreamApiClient.enrichChannelsWithCategories(playlist, parsed)
                 binding.progressBar.visibility = android.view.View.GONE
+                binding.tvLoadingStatus.visibility = android.view.View.GONE
+                binding.btnLoadPlaylist.isEnabled = true
                 if (channels.isEmpty()) {
                     Toast.makeText(this@PlaylistActivity, "Aucune chaîne trouvée. Vérifiez vos identifiants/lien.", Toast.LENGTH_LONG).show()
                     return@launch
@@ -162,14 +169,19 @@ class PlaylistActivity : AppCompatActivity() {
                 // (ChannelRepository) au lieu de les faire passer par l'Intent.
                 PlaylistStore.save(this@PlaylistActivity, playlist)
                 PlaylistStore.setActiveId(this@PlaylistActivity, playlist.id)
+                ChannelCacheStore.save(this@PlaylistActivity, playlist.id, channels)
                 ChannelRepository.setChannels(channels)
                 startActivity(Intent(this@PlaylistActivity, HomeActivity::class.java))
             } catch (e: PlaylistLoadException) {
                 // Message déjà clair et destiné à l'utilisateur (timeout, serveur, réseau...).
                 binding.progressBar.visibility = android.view.View.GONE
+                binding.tvLoadingStatus.visibility = android.view.View.GONE
+                binding.btnLoadPlaylist.isEnabled = true
                 Toast.makeText(this@PlaylistActivity, e.message, Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
                 binding.progressBar.visibility = android.view.View.GONE
+                binding.tvLoadingStatus.visibility = android.view.View.GONE
+                binding.btnLoadPlaylist.isEnabled = true
                 Toast.makeText(this@PlaylistActivity, "Erreur de chargement : ${e.message ?: "inconnue"}.", Toast.LENGTH_LONG).show()
             }
         }

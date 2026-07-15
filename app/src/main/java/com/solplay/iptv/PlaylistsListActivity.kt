@@ -111,6 +111,7 @@ class PlaylistsListActivity : AppCompatActivity() {
                     return@launch
                 }
                 PlaylistStore.setActiveId(this@PlaylistsListActivity, playlist.id)
+                ChannelCacheStore.save(this@PlaylistsListActivity, playlist.id, channels)
                 ChannelRepository.setChannels(channels)
                 startActivity(Intent(this@PlaylistsListActivity, HomeActivity::class.java))
             } catch (e: PlaylistLoadException) {
@@ -137,6 +138,7 @@ class PlaylistsListActivity : AppCompatActivity() {
             .setMessage("Cette playlist sera retirée de la liste.")
             .setPositiveButton("Supprimer") { _, _ ->
                 PlaylistStore.delete(this, playlist.id)
+                ChannelCacheStore.clear(this)
                 refresh()
             }
             .setNegativeButton("Annuler", null)

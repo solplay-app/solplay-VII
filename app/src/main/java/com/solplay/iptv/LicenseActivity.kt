@@ -28,13 +28,23 @@ class LicenseActivity : AppCompatActivity() {
 
         refreshUiState()
 
-        // Revérifie automatiquement auprès de Firebase à l'ouverture de l'écran
-        // (en plus du bouton "Vérifier mon activation"), pour refléter tout
-        // changement fait côté admin (nouvelle durée, renouvellement...)
-        // sans attendre l'expiration de la valeur mise en cache localement.
+        // Revérifie automatiquement auprès de Firebase à l'ouverture de l'écran,
+        // puis en continu toutes les 10 secondes tant que cet écran est affiché
+        // (en plus du bouton "Vérifier mon activation"), pour détecter
+        // automatiquement l'activation faite par l'admin sans que
+        // l'utilisateur ait besoin d'appuyer sur un bouton ou de relancer
+        // l'application : dès que l'admin active la clé, l'écran bascule
+        // seul vers l'interface normale.
         lifecycleScope.launch {
-            TrialManager.checkOnlineLicense(this@LicenseActivity)
-            refreshUiState()
+            while (true) {
+                val active = TrialManager.checkOnlineLicense(this@LicenseActivity)
+                refreshUiState()
+                if (active) {
+                    goToApp()
+                    break
+                }
+                kotlinx.coroutines.delay(10_000)
+            }
         }
 
         // Se met à jour chaque minute tant que l'écran est affiché, au lieu de

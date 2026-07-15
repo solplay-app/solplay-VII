@@ -7,10 +7,13 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.solplay.iptv.databinding.ActivityPlayerBinding
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -26,6 +29,8 @@ class PlayerActivity : AppCompatActivity() {
     private var player: ExoPlayer? = null
     private lateinit var sideAdapter: ChannelAdapter
     private var sideChannels: List<Channel> = emptyList()
+    private var activePlaylist: SavedPlaylist? = null
+    private var programInfoJob: Job? = null
 
     private val hideHandler = Handler(Looper.getMainLooper())
 
@@ -33,6 +38,7 @@ class PlayerActivity : AppCompatActivity() {
     // visibles 5 secondes puis masqués automatiquement, et réaffichés sur simple tap écran.
     private val hideControlsRunnable = Runnable {
         binding.tvChannelTitle.visibility = View.GONE
+        binding.tvProgramInfo.visibility = View.GONE
         if (sideChannels.size > 1) binding.btnChannelList.visibility = View.GONE
     }
 
@@ -62,8 +68,10 @@ class PlayerActivity : AppCompatActivity() {
     /** Construit le panneau latéral avec la liste de chaînes transmise par ChannelsActivity. */
     private fun setupSidePanel() {
         sideChannels = ChannelRepository.playingList
+        activePlaylist = PlaylistStore.getActiveId(this)
+            ?.let { id -> PlaylistStore.getAll(this).firstOrNull { it.id == id } }
         // Layout "dark" : texte blanc, lisible sur le fond transparent qui laisse voir la vidéo.
-        sideAdapter = ChannelAdapter(sideChannels, itemLayoutRes = R.layout.item_channel_dark) { channel ->
+        sideAdapter = ChannelAdapter(sideChannels, itemLayoutRes = R.layout.item_channel_dark, epgPlaylist = activePlaylist) { channel ->
             playStream(channel.streamUrl, channel.name)
             binding.channelListPanel.visibility = View.GONE
             binding.etSideSearch.text?.clear()
@@ -115,7 +123,28 @@ class PlayerActivity : AppCompatActivity() {
             prepare()
             playWhenReady = true
         }
+        loadProgramInfo(url)
         showControlsTemporarily()
+    }
+
+    /** Récupère et affiche le programme en cours (EPG) pour la chaîne en cours de lecture. */
+    private fun loadProgramInfo(streamUrl: String) {
+        programInfoJob?.cancel()
+        binding.tvProgramInfo.visibility = View.GONE
+
+        val playlist = activePlaylist ?: return
+        val isLive = Channel(name = "", logoUrl = null, groupTitle = null, streamUrl = streamUrl).contentType() == ContentType.LIVE
+        if (!isLive) return
+        val streamId = XtreamApiClient.extractStreamId(streamUrl)
+        if (streamId <= 0) return
+
+        programInfoJob = lifecycleScope.launch {
+            val program = XtreamApiClient.fetchNowPlaying(playlist, streamId) ?: return@launch
+            binding.tvProgramInfo.text = "${program.startTime}-${program.endTime} · ${program.title}"
+            if (binding.tvChannelTitle.visibility == View.VISIBLE) {
+                binding.tvProgramInfo.visibility = View.VISIBLE
+            }
+        }
     }
 
     /**
@@ -125,6 +154,7 @@ class PlayerActivity : AppCompatActivity() {
      */
     private fun showControlsTemporarily(keepVisible: Boolean = false) {
         binding.tvChannelTitle.visibility = View.VISIBLE
+        if (binding.tvProgramInfo.text.isNotEmpty()) binding.tvProgramInfo.visibility = View.VISIBLE
         if (sideChannels.size > 1) binding.btnChannelList.visibility = View.VISIBLE
         hideHandler.removeCallbacks(hideControlsRunnable)
         if (!keepVisible) {

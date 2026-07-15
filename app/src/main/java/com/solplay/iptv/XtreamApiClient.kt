@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
+import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
@@ -142,5 +143,73 @@ object XtreamApiClient {
     enum class Kind(val categoriesAction: String, val streamsAction: String) {
         VOD("get_vod_categories", "get_vod_streams"),
         LIVE("get_live_categories", "get_live_streams")
+    }
+
+    /** Programme en cours (ou à venir) pour une chaîne Live. */
+    data class EpgProgram(val title: String, val startTime: String, val endTime: String)
+
+    private val epgCache = java.util.Collections.synchronizedMap(mutableMapOf<String, EpgProgram?>())
+
+    /**
+     * Récupère le programme en cours pour une chaîne Live via l'API EPG native
+     * du panel Xtream (`get_short_epg`). Résultat mis en cache mémoire (clé
+     * serveur+stream_id) le temps de la session, pour éviter de re-solliciter
+     * le serveur à chaque scroll/re-bind de la RecyclerView.
+     *
+     * Best effort : renvoie null si le panel ne fournit pas d'EPG pour cette
+     * chaîne (fréquent - beaucoup de chaînes n'ont simplement pas de données
+     * EPG côté fournisseur), en cas d'erreur réseau, ou hors mode Xtream.
+     */
+    suspend fun fetchNowPlaying(playlist: SavedPlaylist, streamId: Int): EpgProgram? {
+        if (playlist.mode != PlaylistMode.XTREAM || streamId <= 0) return null
+        val base = playlist.xtreamServer.trim().trimEnd('/')
+        val user = playlist.xtreamUsername.trim()
+        val pass = playlist.xtreamPassword.trim()
+        if (base.isEmpty() || user.isEmpty() || pass.isEmpty()) return null
+
+        val cacheKey = "$base|$user|$streamId"
+        if (epgCache.containsKey(cacheKey)) return epgCache[cacheKey]
+
+        return withContext(Dispatchers.IO) {
+            val result = try {
+                val url = "$base/player_api.php?username=$user&password=$pass&action=get_short_epg&stream_id=$streamId&limit=1"
+                val request = Request.Builder().url(url).get().build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use null
+                    val body = response.body?.string().orEmpty()
+                    val listings = JSONObject(body).optJSONArray("epg_listings") ?: return@use null
+                    if (listings.length() == 0) return@use null
+                    val first = listings.getJSONObject(0)
+                    val title = decodeEpgText(first.optString("title"))
+                    if (title.isBlank()) return@use null
+                    EpgProgram(
+                        title = title,
+                        startTime = formatEpgTime(first.optString("start")),
+                        endTime = formatEpgTime(first.optString("stop", first.optString("end")))
+                    )
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Échec EPG stream_id=$streamId : ${e.message}")
+                null
+            }
+            epgCache[cacheKey] = result
+            result
+        }
+    }
+
+    /** Le panel Xtream encode généralement titre/description EPG en Base64. */
+    private fun decodeEpgText(value: String): String {
+        if (value.isBlank()) return ""
+        return try {
+            String(android.util.Base64.decode(value, android.util.Base64.DEFAULT), Charsets.UTF_8).trim()
+        } catch (e: Exception) {
+            value.trim()
+        }
+    }
+
+    /** "2026-07-15 20:00:00" -> "20:00". */
+    private fun formatEpgTime(raw: String): String {
+        val timePart = raw.substringAfter(' ', missingDelimiterValue = raw)
+        return timePart.take(5).ifEmpty { raw }
     }
 }

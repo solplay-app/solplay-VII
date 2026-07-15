@@ -27,8 +27,15 @@ object TrialManager {
     private const val KEY_LICENSE_EXPIRES_AT = "license_expires_at"
     private const val KEY_LICENSE_PLAN_LABEL = "license_plan_label"
 
-    /** Essai gratuit : 24 heures (au lieu des 30 jours précédents). */
-    private const val TRIAL_HOURS = 24L
+    /**
+     * Essai gratuit désactivé : l'application nécessite désormais une
+     * activation par l'administrateur (clé appareil) dès le premier lancement.
+     * On garde TRIAL_HOURS = 0 (plutôt que de supprimer tout le mécanisme)
+     * pour ne pas casser les autres écrans qui référencent encore ces
+     * fonctions : avec 0h, isTrialActive() est toujours false et
+     * canAccessApp() ne dépend donc plus que de la licence.
+     */
+    private const val TRIAL_HOURS = 0L
     private const val MILLIS_PER_HOUR = 1000L * 60 * 60
     private const val TRIAL_MILLIS = TRIAL_HOURS * MILLIS_PER_HOUR
 

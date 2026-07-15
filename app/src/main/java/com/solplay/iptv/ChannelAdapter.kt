@@ -17,10 +17,11 @@ import kotlinx.coroutines.launch
 class ChannelAdapter(
     private var channels: List<Channel>,
     private val itemLayoutRes: Int = R.layout.item_channel,
+    private val epgPlaylist: SavedPlaylist? = null,
     private val onClick: (Channel) -> Unit
 ) : RecyclerView.Adapter<ChannelAdapter.ChannelViewHolder>() {
 
-    // Scope propre à l'adapter pour les recherches TMDB en tâche de fond ;
+    // Scope propre à l'adapter pour les recherches TMDB/EPG en tâche de fond ;
     // annulé quand la RecyclerView qui l'utilise est détruite (voir
     // onDetachedFromRecyclerView), ce qui annule aussi toutes les recherches
     // encore en vol pour des vues alors recyclées.
@@ -30,6 +31,7 @@ class ChannelAdapter(
         val logo: ImageView = view.findViewById(R.id.ivChannelLogo)
         val name: TextView = view.findViewById(R.id.tvChannelName)
         val group: TextView = view.findViewById(R.id.tvChannelGroup)
+        val programInfo: TextView = view.findViewById(R.id.tvProgramInfo)
     }
 
     /** Remplace la liste affichée (utilisé par les filtres onglet/catégorie/recherche). */
@@ -57,6 +59,10 @@ class ChannelAdapter(
         val channel = channels[position]
         holder.name.text = channel.name
         holder.group.text = channel.groupTitle ?: ""
+        // Réinitialisé à chaque bind : la vue peut être recyclée et afficher
+        // encore le programme de la chaîne précédente sinon.
+        holder.programInfo.visibility = View.GONE
+        holder.programInfo.text = ""
 
         // Tag utilisé pour vérifier, à la fin de la recherche TMDB asynchrone,
         // que ce ViewHolder affiche toujours le même élément (il a pu être
@@ -83,7 +89,27 @@ class ChannelAdapter(
             loadTmdbFallback(holder, channel)
         }
 
+        if (channel.contentType() == ContentType.LIVE) {
+            loadProgramInfo(holder, channel)
+        }
+
         holder.itemView.setOnClickListener { onClick(channel) }
+    }
+
+    /** Récupère et affiche le programme en cours ("20:00-21:00 · Titre") pour une chaîne Live. */
+    private fun loadProgramInfo(holder: ChannelViewHolder, channel: Channel) {
+        val playlist = epgPlaylist ?: return
+        val streamId = XtreamApiClient.extractStreamId(channel.streamUrl)
+        if (streamId <= 0) return
+
+        adapterScope.launch {
+            val program = XtreamApiClient.fetchNowPlaying(playlist, streamId)
+            // La vue a pu être recyclée pendant l'appel réseau : on n'applique
+            // le résultat que si elle affiche toujours ce channel.
+            if (holder.itemView.tag != channel || program == null) return@launch
+            holder.programInfo.text = "${program.startTime}-${program.endTime} · ${program.title}"
+            holder.programInfo.visibility = View.VISIBLE
+        }
     }
 
     /** Recherche une affiche TMDB pour les films/séries et l'applique si le ViewHolder affiche toujours ce channel. */

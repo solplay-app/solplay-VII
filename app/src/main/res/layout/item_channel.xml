@@ -37,6 +37,16 @@
             android:layout_height="wrap_content"
             android:textColor="@color/text_channel_group_selector"
             android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/tvProgramInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_channel_group_selector"
+            android:textSize="12sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:visibility="gone" />
     </LinearLayout>
 
 </LinearLayout>

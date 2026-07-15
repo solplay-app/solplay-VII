@@ -58,10 +58,27 @@ class SplashActivity : AppCompatActivity() {
         if (navigated) return
         navigated = true
 
-        val next = if (TrialManager.canAccessApp(this)) {
-            PlaylistActivity::class.java
+        if (!TrialManager.canAccessApp(this)) {
+            startActivity(Intent(this, LicenseActivity::class.java))
+            finish()
+            return
+        }
+
+        // Comme les autres lecteurs IPTV, on "reste connecté" : si une
+        // playlist active a déjà été chargée avec succès, on rouvre
+        // directement sur l'accueil avec les chaînes en cache (instantané),
+        // au lieu de retélécharger toute la playlist et de repasser par
+        // l'écran de connexion à chaque lancement. HomeActivity se charge
+        // ensuite de rafraîchir en arrière-plan si le cache commence à dater.
+        val activeId = PlaylistStore.getActiveId(this)
+        val activePlaylist = activeId?.let { id -> PlaylistStore.getAll(this).firstOrNull { it.id == id } }
+        val cached = activePlaylist?.let { ChannelCacheStore.load(this, it.id) }
+
+        val next = if (activePlaylist != null && cached != null) {
+            ChannelRepository.setChannels(cached)
+            HomeActivity::class.java
         } else {
-            LicenseActivity::class.java
+            PlaylistActivity::class.java
         }
         startActivity(Intent(this, next))
         finish()

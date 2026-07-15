@@ -23,6 +23,20 @@
         android:textColor="@color/solplay_white"
         android:textStyle="bold" />
 
+    <!-- Programme en cours (EPG), affiché/masqué avec le bandeau de titre ci-dessus. -->
+    <TextView
+        android:id="@+id/tvProgramInfo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="46dp"
+        android:background="@color/solplay_panel_overlay"
+        android:padding="6dp"
+        android:textColor="@color/solplay_white"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
     <!-- Bouton pour ouvrir la liste des chaînes sans quitter le lecteur. -->
     <TextView
         android:id="@+id/btnChannelList"

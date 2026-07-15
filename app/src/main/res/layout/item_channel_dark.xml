@@ -40,6 +40,16 @@
             android:layout_height="wrap_content"
             android:textColor="@color/solplay_white_60"
             android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/tvProgramInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/solplay_white_60"
+            android:textSize="11sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:visibility="gone" />
     </LinearLayout>
 
 </LinearLayout>
