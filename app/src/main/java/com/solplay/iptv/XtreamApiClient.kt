@@ -212,4 +212,67 @@ object XtreamApiClient {
         val timePart = raw.substringAfter(' ', missingDelimiterValue = raw)
         return timePart.take(5).ifEmpty { raw }
     }
+
+    /** Résultat de la vérification du statut d'un abonnement Xtream. */
+    data class AccountStatus(
+        val expired: Boolean,
+        /** Statut brut renvoyé par le panel ("Active", "Expired", "Banned", "Disabled"...). */
+        val statusLabel: String?,
+        /** Date d'expiration en millisecondes (epoch), null si non fournie/illimitée. */
+        val expiresAtMillis: Long?
+    )
+
+    /**
+     * Interroge l'API native du panel Xtream (`player_api.php`, sans paramètre
+     * `action`) pour connaître le statut réel de l'abonnement : actif, expiré,
+     * banni, désactivé... et sa date d'expiration (`exp_date`, en secondes epoch).
+     *
+     * Fonctionne aussi bien pour une playlist enregistrée en mode Xtream que
+     * pour un simple lien M3U qui se trouve être un lien Xtream déguisé
+     * (voir SavedPlaylist.extractXtreamCredentials) - c'est justement ce qui
+     * permet de détecter l'expiration d'un "code M3U" alors qu'aucune API
+     * classique ne l'annoncerait autrement (le fichier M3U continue souvent
+     * d'être servi tel quel même après expiration, seuls les flux eux-mêmes
+     * cessent de fonctionner).
+     *
+     * Best effort : renvoie null si les identifiants n'ont pas pu être extraits,
+     * en cas d'erreur réseau, ou si le panel ne renvoie pas les champs attendus -
+     * dans ce cas on ne peut simplement pas se prononcer sur l'expiration, mais
+     * on n'affiche jamais un message d'expiration à tort.
+     */
+    suspend fun checkAccountStatus(playlist: SavedPlaylist): AccountStatus? {
+        val (server, user, pass) = playlist.extractXtreamCredentials() ?: return null
+
+        return withContext(Dispatchers.IO) {
+            try {
+                val url = "$server/player_api.php?username=$user&password=$pass"
+                val request = Request.Builder().url(url).get().build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use null
+                    val body = response.body?.string().orEmpty()
+                    val userInfo = JSONObject(body).optJSONObject("user_info") ?: return@use null
+
+                    val statusLabel = userInfo.optString("status").takeIf { it.isNotBlank() }
+                    val expDateRaw = userInfo.optString("exp_date").takeIf { it.isNotBlank() && it != "null" }
+                    val expiresAtMillis = expDateRaw?.toLongOrNull()?.times(1000L)
+
+                    val now = System.currentTimeMillis()
+                    val expiredByDate = expiresAtMillis != null && expiresAtMillis < now
+                    // Certains panels renvoient un status explicite ("Expired", "Banned",
+                    // "Disabled") indépendamment de exp_date : on considère expiré/bloqué
+                    // dès que ce n'est pas "Active", en plus de la date elle-même.
+                    val expiredByStatus = statusLabel != null && !statusLabel.equals("Active", ignoreCase = true)
+
+                    AccountStatus(
+                        expired = expiredByDate || expiredByStatus,
+                        statusLabel = statusLabel,
+                        expiresAtMillis = expiresAtMillis
+                    )
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Échec vérification statut abonnement : ${e.message}")
+                null
+            }
+        }
+    }
 }

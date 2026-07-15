@@ -1,14 +1,17 @@
 package com.solplay.iptv
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.tabs.TabLayout
 import com.solplay.iptv.databinding.ActivityChannelsBinding
+import kotlinx.coroutines.launch
 
 class ChannelsActivity : AppCompatActivity() {
 
@@ -60,6 +63,48 @@ class ChannelsActivity : AppCompatActivity() {
 
         refreshBouquets()
         applyFilters()
+
+        checkSubscriptionExpiration(activePlaylist)
+    }
+
+    /**
+     * Vérifie en tâche de fond si l'abonnement (code M3U/Xtream) est expiré,
+     * et affiche une alerte claire si c'est le cas.
+     *
+     * Pourquoi c'est nécessaire : un code M3U/Xtream expiré continue très
+     * souvent d'être servi tel quel par le panel du fournisseur (la liste de
+     * chaînes se charge normalement, comme si de rien n'était) - seuls les
+     * flux vidéo eux-mêmes cessent de fonctionner à la lecture, sans qu'aucun
+     * message ne l'explique à l'utilisateur. On interroge donc ici l'API du
+     * panel pour connaître le vrai statut du compte.
+     *
+     * Sans effet (silencieux) si la playlist n'est pas reconnue comme un
+     * lien Xtream (voir SavedPlaylist.extractXtreamCredentials) ou en cas
+     * d'erreur réseau : on ne bloque jamais l'accès sur la base d'une
+     * vérification qui a échoué.
+     */
+    private fun checkSubscriptionExpiration(playlist: SavedPlaylist?) {
+        if (playlist == null) return
+        lifecycleScope.launch {
+            val status = XtreamApiClient.checkAccountStatus(playlist) ?: return@launch
+            if (status.expired && !isFinishing) {
+                val expiryText = status.expiresAtMillis?.let { TrialManager.formatDate(it) }
+                val message = buildString {
+                    append("Votre abonnement IPTV (")
+                    append(playlist.name)
+                    append(") est arrivé à expiration")
+                    if (expiryText != null) append(" le $expiryText")
+                    append(".\n\nLes chaînes affichées ne pourront plus être lues. ")
+                    append("Contactez votre fournisseur pour renouveler votre code.")
+                }
+                AlertDialog.Builder(this@ChannelsActivity)
+                    .setTitle("⚠️ Abonnement expiré")
+                    .setMessage(message)
+                    .setPositiveButton("OK", null)
+                    .setCancelable(true)
+                    .show()
+            }
+        }
     }
 
     private fun openPlayer(channel: Channel) {

@@ -1,14 +1,18 @@
 package com.solplay.iptv
 
+import android.app.AlertDialog
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.solplay.iptv.databinding.ActivityPlayerBinding
@@ -52,6 +56,11 @@ class PlayerActivity : AppCompatActivity() {
 
         player = ExoPlayer.Builder(this).build().also { exoPlayer ->
             binding.playerView.player = exoPlayer
+            exoPlayer.addListener(object : Player.Listener {
+                override fun onPlayerError(error: PlaybackException) {
+                    handlePlaybackError()
+                }
+            })
         }
 
         setupSidePanel()
@@ -112,6 +121,45 @@ class PlayerActivity : AppCompatActivity() {
         } else {
             binding.etSideSearch.text?.clear()
             showControlsTemporarily()
+        }
+    }
+
+    /**
+     * Appelé quand ExoPlayer échoue à lire le flux en cours. Avant d'afficher
+     * une simple erreur générique, on vérifie si la cause probable est
+     * l'expiration de l'abonnement (voir XtreamApiClient.checkAccountStatus) :
+     * c'est le cas le plus fréquent et le plus déroutant pour l'utilisateur,
+     * puisque la liste de chaînes continue elle de s'afficher normalement.
+     */
+    private fun handlePlaybackError() {
+        val playlist = activePlaylist
+        if (playlist == null) {
+            Toast.makeText(this, "Erreur de lecture. Vérifiez votre connexion et réessayez.", Toast.LENGTH_LONG).show()
+            return
+        }
+        lifecycleScope.launch {
+            val status = XtreamApiClient.checkAccountStatus(playlist)
+            if (isFinishing) return@launch
+            if (status?.expired == true) {
+                val expiryText = status.expiresAtMillis?.let { TrialManager.formatDate(it) }
+                val message = buildString {
+                    append("Votre abonnement IPTV est arrivé à expiration")
+                    if (expiryText != null) append(" le $expiryText")
+                    append(".\n\nContactez votre fournisseur pour renouveler votre code.")
+                }
+                AlertDialog.Builder(this@PlayerActivity)
+                    .setTitle("⚠️ Abonnement expiré")
+                    .setMessage(message)
+                    .setPositiveButton("OK") { _, _ -> finish() }
+                    .setCancelable(false)
+                    .show()
+            } else {
+                Toast.makeText(
+                    this@PlayerActivity,
+                    "Impossible de lire cette chaîne pour le moment. Réessayez plus tard.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 
