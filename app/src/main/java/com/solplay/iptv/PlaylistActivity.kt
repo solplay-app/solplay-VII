@@ -105,6 +105,28 @@ class PlaylistActivity : AppCompatActivity() {
         binding.etXtreamServer.setText(playlist.xtreamServer)
         binding.etXtreamUsername.setText(playlist.xtreamUsername)
         binding.etXtreamPassword.setText(playlist.xtreamPassword)
+
+        // Playlist fournie par l'admin (code saisi ou assignation automatique) :
+        // le client peut ouvrir "Modifier" pour renommer sa playlist, mais le
+        // lien M3U / les identifiants Xtream fournis par l'admin doivent rester
+        // masqués (points, comme un mot de passe) et non modifiables.
+        if (playlist.fromCode != null) {
+            maskSensitiveField(binding.etPlaylistUrl)
+            maskSensitiveField(binding.etXtreamServer)
+            maskSensitiveField(binding.etXtreamUsername)
+            maskSensitiveField(binding.etXtreamPassword)
+            binding.rbM3u.isEnabled = false
+            binding.rbXtream.isEnabled = false
+        }
+    }
+
+    /** Masque visuellement le contenu d'un champ (comme un mot de passe) et empêche sa modification. */
+    private fun maskSensitiveField(editText: android.widget.EditText) {
+        editText.transformationMethod = android.text.method.PasswordTransformationMethod.getInstance()
+        editText.keyListener = null
+        editText.isFocusable = false
+        editText.isFocusableInTouchMode = false
+        editText.isCursorVisible = false
     }
 
     /**
@@ -115,6 +137,12 @@ class PlaylistActivity : AppCompatActivity() {
      */
     private fun buildPlaylist(): SavedPlaylist? {
         val name = binding.etPlaylistName.text.toString().trim().ifEmpty { "Ma playlist" }
+        // En mode édition, on conserve le tag d'origine (fromCode) pour ne pas
+        // perdre le marquage "fournie par l'admin" (et donc le masquage) après
+        // un simple rechargement de la playlist.
+        val existingFromCode = editingId?.let { id ->
+            PlaylistStore.getAll(this).firstOrNull { it.id == id }?.fromCode
+        }
         return if (binding.rbXtream.isChecked) {
             val server = binding.etXtreamServer.text.toString().trim().trimEnd('/')
             val username = binding.etXtreamUsername.text.toString().trim()
@@ -128,7 +156,8 @@ class PlaylistActivity : AppCompatActivity() {
                     mode = PlaylistMode.XTREAM,
                     xtreamServer = server,
                     xtreamUsername = username,
-                    xtreamPassword = password
+                    xtreamPassword = password,
+                    fromCode = existingFromCode
                 )
             }
         } else {
@@ -140,7 +169,8 @@ class PlaylistActivity : AppCompatActivity() {
                     id = editingId ?: java.util.UUID.randomUUID().toString(),
                     name = name,
                     mode = PlaylistMode.M3U,
-                    m3uUrl = url
+                    m3uUrl = url,
+                    fromCode = existingFromCode
                 )
             }
         }

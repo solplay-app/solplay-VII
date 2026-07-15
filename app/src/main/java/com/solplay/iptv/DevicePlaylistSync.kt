@@ -34,10 +34,17 @@ object DevicePlaylistSync {
                 val remoteId = child.key ?: continue
                 val tag = "device:$remoteId"
                 val active = child.child("active").getValue(Boolean::class.java) ?: true
+                val expiresAt = child.child("expiresAt").getValue(Long::class.java) ?: 0L
+                // Même correction d'horloge que TrialManager (offset serveur Firebase),
+                // pour éviter qu'un simple changement de date locale sur l'appareil
+                // ne prolonge artificiellement une assignation expirée.
+                val trustedNow = System.currentTimeMillis() + TrialManager.getServerTimeOffsetMillis(context)
+                val expired = expiresAt > 0L && trustedNow >= expiresAt
                 val alreadySaved = existing.firstOrNull { it.fromCode == tag }
 
-                if (!active) {
-                    // L'admin a retiré/désactivé cette assignation : on enlève la copie locale.
+                if (!active || expired) {
+                    // L'admin a retiré/désactivé cette assignation, ou sa durée est
+                    // écoulée : on enlève la copie locale.
                     alreadySaved?.let { PlaylistStore.delete(context, it.id) }
                     continue
                 }
