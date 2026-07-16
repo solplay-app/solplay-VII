@@ -165,13 +165,32 @@ class PlaylistActivity : AppCompatActivity() {
             if (url.isEmpty()) {
                 null
             } else {
-                SavedPlaylist(
-                    id = editingId ?: java.util.UUID.randomUUID().toString(),
-                    name = name,
-                    mode = PlaylistMode.M3U,
-                    m3uUrl = url,
-                    fromCode = existingFromCode
-                )
+                // Si le lien collé est en réalité un lien Xtream déguisé
+                // (get.php?username=...&password=...), on bascule automatiquement
+                // en mode Xtream pour bénéficier des enrichissements (catégories,
+                // logos manquants, EPG "en cours", détection d'expiration) -
+                // au lieu de rester en mode M3U "brut" qui ne les active jamais.
+                val detected = SavedPlaylist.detectXtreamCredentials(url)
+                if (detected != null) {
+                    val (server, username, password) = detected
+                    SavedPlaylist(
+                        id = editingId ?: java.util.UUID.randomUUID().toString(),
+                        name = name,
+                        mode = PlaylistMode.XTREAM,
+                        xtreamServer = server,
+                        xtreamUsername = username,
+                        xtreamPassword = password,
+                        fromCode = existingFromCode
+                    )
+                } else {
+                    SavedPlaylist(
+                        id = editingId ?: java.util.UUID.randomUUID().toString(),
+                        name = name,
+                        mode = PlaylistMode.M3U,
+                        m3uUrl = url,
+                        fromCode = existingFromCode
+                    )
+                }
             }
         }
     }

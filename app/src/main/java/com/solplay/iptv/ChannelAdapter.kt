@@ -18,6 +18,7 @@ class ChannelAdapter(
     private var channels: List<Channel>,
     private val itemLayoutRes: Int = R.layout.item_channel,
     private val epgPlaylist: SavedPlaylist? = null,
+    private val onLongClick: ((Channel) -> Unit)? = null,
     private val onClick: (Channel) -> Unit
 ) : RecyclerView.Adapter<ChannelAdapter.ChannelViewHolder>() {
 
@@ -94,6 +95,14 @@ class ChannelAdapter(
         }
 
         holder.itemView.setOnClickListener { onClick(channel) }
+        holder.itemView.setOnLongClickListener {
+            if (channel.contentType() == ContentType.LIVE && onLongClick != null) {
+                onLongClick.invoke(channel)
+                true
+            } else {
+                false
+            }
+        }
     }
 
     /** Récupère et affiche le programme en cours ("20:00-21:00 · Titre") pour une chaîne Live. */

@@ -36,8 +36,24 @@ object XtreamApiClient {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    /** stream_id (VOD ou Live, selon [kind]) -> nom de catégorie. */
-    suspend fun fetchCategoryMap(playlist: SavedPlaylist, kind: Kind): Map<Int, String> {
+    /** Catégorie + logo (icône) connus par le panel pour un stream_id donné. */
+    data class StreamInfo(val categoryName: String?, val logoUrl: String?)
+
+    /** stream_id (VOD ou Live, selon [kind]) -> nom de catégorie. Conservé pour compat. */
+    suspend fun fetchCategoryMap(playlist: SavedPlaylist, kind: Kind): Map<Int, String> =
+        fetchStreamInfoMap(playlist, kind).mapNotNull { (id, info) ->
+            info.categoryName?.let { id to it }
+        }.toMap()
+
+    /**
+     * stream_id (VOD ou Live, selon [kind]) -> catégorie + logo connus par
+     * l'API JSON native du panel (`player_api.php`). Contrairement au fichier
+     * M3U (`get.php?...type=m3u_plus`), qui omet parfois `group-title` et/ou
+     * `tvg-logo` selon les panels, l'API `get_live_streams` / `get_vod_streams`
+     * renvoie presque toujours `category_id` et `stream_icon` pour chaque
+     * chaîne/film - on s'en sert donc pour compléter ce qui manque côté M3U.
+     */
+    suspend fun fetchStreamInfoMap(playlist: SavedPlaylist, kind: Kind): Map<Int, StreamInfo> {
         if (playlist.mode != PlaylistMode.XTREAM) return emptyMap()
 
         return withContext(Dispatchers.IO) {
@@ -58,25 +74,26 @@ object XtreamApiClient {
                     val name = c.optString("category_name")
                     if (id.isNotEmpty() && name.isNotEmpty()) categoryNames[id] = name
                 }
-                if (categoryNames.isEmpty()) return@withContext emptyMap()
 
                 val streams = fetchJsonArray(
                     "$base/player_api.php?username=$user&password=$pass&action=${kind.streamsAction}"
                 ) ?: return@withContext emptyMap()
 
-                val result = mutableMapOf<Int, String>()
+                val result = mutableMapOf<Int, StreamInfo>()
                 for (i in 0 until streams.length()) {
                     val s = streams.optJSONObject(i) ?: continue
                     val streamId = s.optInt("stream_id", -1)
+                    if (streamId <= 0) continue
                     val categoryId = s.optString("category_id")
                     val categoryName = categoryNames[categoryId]
-                    if (streamId > 0 && categoryName != null) {
-                        result[streamId] = categoryName
+                    val logoUrl = s.optString("stream_icon").takeIf { it.isNotBlank() }
+                    if (categoryName != null || logoUrl != null) {
+                        result[streamId] = StreamInfo(categoryName, logoUrl)
                     }
                 }
                 result
             } catch (e: Exception) {
-                Log.w(TAG, "Échec récupération des catégories Xtream (${kind.name}) : ${e.message}")
+                Log.w(TAG, "Échec récupération des infos Xtream (${kind.name}) : ${e.message}")
                 emptyMap()
             }
         }
@@ -120,23 +137,33 @@ object XtreamApiClient {
     suspend fun enrichChannelsWithCategories(playlist: SavedPlaylist, channels: List<Channel>): List<Channel> {
         if (playlist.mode != PlaylistMode.XTREAM) return channels
 
-        val needsVod = channels.any { it.contentType() == ContentType.MOVIE && it.groupTitle.isNullOrBlank() }
-        val needsLive = channels.any { it.contentType() == ContentType.LIVE && it.groupTitle.isNullOrBlank() }
+        // On regarde s'il manque au moins une catégorie OU un logo (pas
+        // seulement la catégorie comme avant) : beaucoup de panels omettent
+        // le tvg-logo dans le M3U des chaînes Live alors que l'API JSON
+        // native (get_live_streams) le connaît via stream_icon.
+        val needsVod = channels.any {
+            it.contentType() == ContentType.MOVIE && (it.groupTitle.isNullOrBlank() || it.logoUrl.isNullOrBlank())
+        }
+        val needsLive = channels.any {
+            it.contentType() == ContentType.LIVE && (it.groupTitle.isNullOrBlank() || it.logoUrl.isNullOrBlank())
+        }
         if (!needsVod && !needsLive) return channels
 
-        val vodMap = if (needsVod) fetchCategoryMap(playlist, Kind.VOD) else emptyMap()
-        val liveMap = if (needsLive) fetchCategoryMap(playlist, Kind.LIVE) else emptyMap()
+        val vodMap = if (needsVod) fetchStreamInfoMap(playlist, Kind.VOD) else emptyMap()
+        val liveMap = if (needsLive) fetchStreamInfoMap(playlist, Kind.LIVE) else emptyMap()
         if (vodMap.isEmpty() && liveMap.isEmpty()) return channels
 
         return channels.map { channel ->
-            if (!channel.groupTitle.isNullOrBlank()) return@map channel
             val map = when (channel.contentType()) {
                 ContentType.MOVIE -> vodMap
                 ContentType.LIVE -> liveMap
                 else -> return@map channel
             }
-            val category = map[extractStreamId(channel.streamUrl)] ?: return@map channel
-            channel.copy(groupTitle = category)
+            val info = map[extractStreamId(channel.streamUrl)] ?: return@map channel
+            channel.copy(
+                groupTitle = channel.groupTitle.takeUnless { it.isNullOrBlank() } ?: info.categoryName ?: channel.groupTitle,
+                logoUrl = channel.logoUrl.takeUnless { it.isNullOrBlank() } ?: info.logoUrl ?: channel.logoUrl
+            )
         }
     }
 
@@ -207,10 +234,125 @@ object XtreamApiClient {
         }
     }
 
+    private val guideCache = java.util.Collections.synchronizedMap(mutableMapOf<String, List<EpgProgram>>())
+
+    /**
+     * Récupère le programme complet à venir (pas seulement l'émission en
+     * cours) pour une chaîne Live, via `get_short_epg` avec une [limit] plus
+     * grande. C'est ce qui alimente la boîte de dialogue "Programme TV"
+     * ouverte en appui long sur une chaîne - contrairement à [fetchNowPlaying]
+     * qui n'affiche qu'une ligne dans la liste.
+     *
+     * Ne remplace pas une grille multi-chaînes façon zappeur (comme dans
+     * IPTV Smarters) : ça resterait à construire comme un écran à part
+     * entière (grille avec défilement horizontal synchronisé sur toutes les
+     * chaînes). Ici, c'est le programme d'UNE chaîne, dans l'ordre chronologique.
+     *
+     * Best effort : liste vide si le panel ne fournit pas d'EPG pour cette
+     * chaîne, en cas d'erreur réseau, ou hors mode Xtream.
+     */
+    suspend fun fetchProgramGuide(playlist: SavedPlaylist, streamId: Int, limit: Int = 20): List<EpgProgram> {
+        if (playlist.mode != PlaylistMode.XTREAM || streamId <= 0) return emptyList()
+        val base = playlist.xtreamServer.trim().trimEnd('/')
+        val user = playlist.xtreamUsername.trim()
+        val pass = playlist.xtreamPassword.trim()
+        if (base.isEmpty() || user.isEmpty() || pass.isEmpty()) return emptyList()
+
+        val cacheKey = "$base|$user|$streamId|$limit"
+        guideCache[cacheKey]?.let { return it }
+
+        return withContext(Dispatchers.IO) {
+            val result = try {
+                val url = "$base/player_api.php?username=$user&password=$pass&action=get_short_epg&stream_id=$streamId&limit=$limit"
+                val request = Request.Builder().url(url).get().build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use emptyList()
+                    val body = response.body?.string().orEmpty()
+                    val listings = JSONObject(body).optJSONArray("epg_listings") ?: return@use emptyList()
+                    (0 until listings.length()).mapNotNull { i ->
+                        val item = listings.optJSONObject(i) ?: return@mapNotNull null
+                        val title = decodeEpgText(item.optString("title"))
+                        if (title.isBlank()) return@mapNotNull null
+                        EpgProgram(
+                            title = title,
+                            startTime = formatEpgTime(item.optString("start")),
+                            endTime = formatEpgTime(item.optString("stop", item.optString("end")))
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Échec programme complet stream_id=$streamId : ${e.message}")
+                emptyList()
+            }
+            guideCache[cacheKey] = result
+            result
+        }
+    }
+
     /** "2026-07-15 20:00:00" -> "20:00". */
     private fun formatEpgTime(raw: String): String {
         val timePart = raw.substringAfter(' ', missingDelimiterValue = raw)
         return timePart.take(5).ifEmpty { raw }
+    }
+
+    /** Une émission avec ses horaires en epoch millis (nécessaire pour positionner les blocs de la grille EPG). */
+    data class EpgSlotRaw(val title: String, val startMillis: Long, val endMillis: Long)
+
+    private val slotsCache = java.util.Collections.synchronizedMap(mutableMapOf<String, List<EpgSlotRaw>>())
+
+    /**
+     * Version "brute" (avec timestamps réels) de [fetchProgramGuide], utilisée
+     * par la grille EPG multi-chaînes (EpgGridActivity) pour calculer la
+     * largeur et la position de chaque bloc de programme sur la frise horaire
+     * commune. [fetchProgramGuide]/[fetchNowPlaying] ne gardent que "HH:mm"
+     * formaté, insuffisant ici (on a besoin de savoir *quel jour* aussi).
+     */
+    suspend fun fetchProgramSlotsRaw(playlist: SavedPlaylist, streamId: Int, limit: Int = 30): List<EpgSlotRaw> {
+        if (playlist.mode != PlaylistMode.XTREAM || streamId <= 0) return emptyList()
+        val base = playlist.xtreamServer.trim().trimEnd('/')
+        val user = playlist.xtreamUsername.trim()
+        val pass = playlist.xtreamPassword.trim()
+        if (base.isEmpty() || user.isEmpty() || pass.isEmpty()) return emptyList()
+
+        val cacheKey = "$base|$user|$streamId|slots|$limit"
+        slotsCache[cacheKey]?.let { return it }
+
+        return withContext(Dispatchers.IO) {
+            val result = try {
+                val url = "$base/player_api.php?username=$user&password=$pass&action=get_short_epg&stream_id=$streamId&limit=$limit"
+                val request = Request.Builder().url(url).get().build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use emptyList()
+                    val body = response.body?.string().orEmpty()
+                    val listings = JSONObject(body).optJSONArray("epg_listings") ?: return@use emptyList()
+                    (0 until listings.length()).mapNotNull { i ->
+                        val item = listings.optJSONObject(i) ?: return@mapNotNull null
+                        val title = decodeEpgText(item.optString("title"))
+                        if (title.isBlank()) return@mapNotNull null
+                        val start = parseEpgMillis(item.optString("start")) ?: return@mapNotNull null
+                        val end = parseEpgMillis(item.optString("stop", item.optString("end"))) ?: return@mapNotNull null
+                        if (end <= start) return@mapNotNull null
+                        EpgSlotRaw(title, start, end)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Échec récupération créneaux EPG stream_id=$streamId : ${e.message}")
+                emptyList()
+            }
+            slotsCache[cacheKey] = result
+            result
+        }
+    }
+
+    /** Parse un horodatage EPG Xtream ("yyyy-MM-dd HH:mm:ss") en epoch millis. */
+    private fun parseEpgMillis(raw: String): Long? {
+        if (raw.isBlank()) return null
+        return try {
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+            sdf.parse(raw)?.time
+        } catch (e: Exception) {
+            null
+        }
     }
 
     /** Résultat de la vérification du statut d'un abonnement Xtream. */

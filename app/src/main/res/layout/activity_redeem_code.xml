@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/solplay_white"
+    android:background="@color/solplay_bg_dark"
     android:padding="24dp">
 
     <TextView
@@ -27,7 +27,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
         android:hint="Ex: SOLPLAY123"
-        android:textColor="@color/solplay_black"
+        android:textColor="@color/solplay_text_primary_dark"
         android:textColorHint="@color/solplay_text_secondary" />
 
     <Button

@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="24dp"
-    android:background="@color/solplay_white">
+    android:background="@color/solplay_bg_dark">
 
     <TextView
         android:layout_width="wrap_content"
@@ -26,7 +26,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="24dp"
-        android:textColor="@color/solplay_black"
+        android:textColor="@color/solplay_text_primary_dark"
         android:textStyle="bold" />
 
     <TextView
@@ -65,7 +65,7 @@
         android:layout_marginTop="8dp"
         android:background="@color/solplay_gray"
         android:padding="12dp"
-        android:textColor="@color/solplay_black"
+        android:textColor="@color/solplay_text_primary_dark"
         android:textStyle="bold"
         android:textIsSelectable="true" />
 
@@ -96,13 +96,13 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:text="@string/contact_email"
-        android:textColor="@color/solplay_black" />
+        android:textColor="@color/solplay_text_primary_dark" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:text="@string/contact_phone"
-        android:textColor="@color/solplay_black" />
+        android:textColor="@color/solplay_text_primary_dark" />
 
 </LinearLayout>

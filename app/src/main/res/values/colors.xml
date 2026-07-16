@@ -6,10 +6,17 @@
     <color name="solplay_green_dark">#124D26</color>
     <color name="solplay_white">#FFFFFF</color>
     <color name="solplay_black">#1A1A1A</color>
-    <color name="solplay_gray">#F2F2F2</color>
-    <color name="solplay_text_secondary">#666666</color>
+    <color name="solplay_gray">#2A2C31</color>
+    <color name="solplay_text_secondary">#A0A4AB</color>
     <color name="whatsapp_green">#25D366</color>
     <color name="whatsapp_green_dark">#128C7E</color>
+
+    <!-- Thème sombre : fond général un peu sombre (pas noir pur) + surfaces légèrement translucides,
+         pour un rendu plus reposant pour les yeux que l'ancien fond blanc. -->
+    <color name="solplay_bg_dark">#1B1D21</color>
+    <color name="ic_launcher_background">#10151C</color>
+    <color name="solplay_surface_dark_translucent">#E62A2C31</color>
+    <color name="solplay_text_primary_dark">#F0F0F0</color>
 
     <!-- Panneau "Changer de chaîne" en surimpression sur la vidéo : fonds semi-transparents. -->
     <color name="solplay_panel_overlay">#CC1A1A1A</color>

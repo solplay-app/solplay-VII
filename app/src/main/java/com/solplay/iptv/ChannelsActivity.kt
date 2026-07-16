@@ -40,7 +40,11 @@ class ChannelsActivity : AppCompatActivity() {
         val activePlaylist = PlaylistStore.getActiveId(this)
             ?.let { id -> PlaylistStore.getAll(this).firstOrNull { it.id == id } }
 
-        channelAdapter = ChannelAdapter(emptyList(), epgPlaylist = activePlaylist) { channel -> openPlayer(channel) }
+        channelAdapter = ChannelAdapter(
+            emptyList(),
+            epgPlaylist = activePlaylist,
+            onLongClick = { channel -> showProgramGuide(channel, activePlaylist) }
+        ) { channel -> openPlayer(channel) }
         binding.recyclerChannels.layoutManager = LinearLayoutManager(this)
         binding.recyclerChannels.adapter = channelAdapter
 
@@ -54,6 +58,8 @@ class ChannelsActivity : AppCompatActivity() {
 
         setupTabs()
         setupSearch()
+
+        binding.btnEpgGrid.setOnClickListener { openEpgGrid() }
 
         when (intent.getStringExtra(EXTRA_INITIAL_TYPE)) {
             ContentType.MOVIE.name -> binding.tabLayout.getTabAt(1)?.select()
@@ -105,6 +111,77 @@ class ChannelsActivity : AppCompatActivity() {
                     .show()
             }
         }
+    }
+
+    /**
+     * Affiche le programme complet à venir d'une chaîne (appui long sur la
+     * chaîne dans la liste). Contrairement à la ligne "en cours" affichée
+     * directement dans la liste, ceci montre plusieurs émissions dans
+     * l'ordre chronologique - le maximum qu'on puisse obtenir sans
+     * construire un écran de grille façon zappeur multi-chaînes.
+     */
+    private fun showProgramGuide(channel: Channel, playlist: SavedPlaylist?) {
+        if (playlist == null) return
+        val streamId = XtreamApiClient.extractStreamId(channel.streamUrl)
+        if (streamId <= 0) return
+
+        val loadingDialog = AlertDialog.Builder(this)
+            .setTitle(channel.name)
+            .setMessage("Chargement du programme…")
+            .setCancelable(true)
+            .create()
+        loadingDialog.show()
+
+        lifecycleScope.launch {
+            val programs = XtreamApiClient.fetchProgramGuide(playlist, streamId, limit = 20)
+            if (isFinishing) return@launch
+            loadingDialog.dismiss()
+
+            if (programs.isEmpty()) {
+                AlertDialog.Builder(this@ChannelsActivity)
+                    .setTitle(channel.name)
+                    .setMessage("Aucune information de programme disponible pour cette chaîne.")
+                    .setPositiveButton("OK", null)
+                    .show()
+                return@launch
+            }
+
+            val lines = programs.map { "${it.startTime} - ${it.endTime}\n${it.title}" }.toTypedArray()
+            AlertDialog.Builder(this@ChannelsActivity)
+                .setTitle(channel.name)
+                .setItems(lines, null)
+                .setPositiveButton("Fermer", null)
+                .show()
+        }
+    }
+
+    /**
+     * Ouvre la grille EPG multi-chaînes pour les chaînes Live actuellement
+     * affichées (bouquet + recherche en cours). La grille s'appuie sur l'API
+     * Xtream (`get_short_epg`) : elle n'est donc proposée que pour une
+     * playlist ajoutée/détectée en mode Xtream (voir SavedPlaylist).
+     */
+    private fun openEpgGrid() {
+        val activePlaylist = PlaylistStore.getActiveId(this)
+            ?.let { id -> PlaylistStore.getAll(this).firstOrNull { it.id == id } }
+
+        if (activePlaylist == null || activePlaylist.mode != PlaylistMode.XTREAM) {
+            android.widget.Toast.makeText(
+                this,
+                "La grille EPG nécessite une playlist Xtream Codes (le programme n'est pas fourni par un simple lien M3U générique).",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        val liveChannels = channelAdapter.currentList().filter { it.contentType() == ContentType.LIVE }
+        if (liveChannels.isEmpty()) {
+            android.widget.Toast.makeText(this, "Aucune chaîne Live à afficher.", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        ChannelRepository.setEpgGridChannels(liveChannels)
+        startActivity(Intent(this, EpgGridActivity::class.java))
     }
 
     private fun openPlayer(channel: Channel) {

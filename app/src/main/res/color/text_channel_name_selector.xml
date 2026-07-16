@@ -3,5 +3,5 @@
     <item android:color="@color/solplay_white" android:state_focused="true" />
     <item android:color="@color/solplay_white" android:state_pressed="true" />
     <item android:color="@color/solplay_white" android:state_selected="true" />
-    <item android:color="@color/solplay_black" />
+    <item android:color="@color/solplay_text_primary_dark" />
 </selector>

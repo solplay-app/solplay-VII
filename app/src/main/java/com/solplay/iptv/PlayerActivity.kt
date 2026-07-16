@@ -7,8 +7,12 @@ import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -51,6 +55,12 @@ class PlayerActivity : AppCompatActivity() {
         binding = ActivityPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Plein écran immersif : masque la barre de statut et la barre de navigation
+        // pour que la vidéo occupe tout l'écran. L'écran reste aussi allumé pendant
+        // la lecture (évite la mise en veille automatique).
+        enableImmersiveFullscreen()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         val startUrl = intent.getStringExtra(EXTRA_STREAM_URL) ?: return
         val startName = intent.getStringExtra(EXTRA_STREAM_NAME) ?: ""
 
@@ -72,6 +82,27 @@ class PlayerActivity : AppCompatActivity() {
 
         binding.btnChannelList.setOnClickListener { toggleSidePanel() }
         setupSideSearch()
+    }
+
+    /**
+     * Passe la fenêtre en plein écran immersif : la barre de statut et la barre de
+     * navigation système sont masquées et la vidéo occupe tout l'écran. Elles peuvent
+     * revenir temporairement avec un balayage depuis le bord, puis se remasquent seules
+     * (comportement "immersive sticky").
+     */
+    private fun enableImmersiveFullscreen() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val controller = WindowInsetsControllerCompat(window, binding.root)
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // Sur certains appareils, les barres système peuvent réapparaître quand la
+        // fenêtre reprend le focus (ex: retour d'un dialogue) : on les remasque.
+        if (hasFocus) enableImmersiveFullscreen()
     }
 
     /** Construit le panneau latéral avec la liste de chaînes transmise par ChannelsActivity. */

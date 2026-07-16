@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/solplay_white">
+    android:background="@color/solplay_bg_dark">
 
 <LinearLayout
     android:layout_width="match_parent"
@@ -63,7 +63,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="@string/hint_playlist_name"
-            android:textColor="@color/solplay_black"
+            android:textColor="@color/solplay_text_primary_dark"
             android:textColorHint="@color/solplay_text_secondary" />
 
         <RadioGroup
@@ -80,7 +80,7 @@
                 android:layout_weight="1"
                 android:checked="true"
                 android:text="@string/mode_m3u"
-                android:textColor="@color/solplay_black" />
+                android:textColor="@color/solplay_text_primary_dark" />
 
             <RadioButton
                 android:id="@+id/rbXtream"
@@ -88,7 +88,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="@string/mode_xtream"
-                android:textColor="@color/solplay_black" />
+                android:textColor="@color/solplay_text_primary_dark" />
         </RadioGroup>
 
         <!-- Bloc Lien M3U -->
@@ -112,7 +112,7 @@
                 android:layout_height="wrap_content"
                 android:hint="http://exemple.com/playlist.m3u"
                 android:inputType="textUri"
-                android:textColor="@color/solplay_black"
+                android:textColor="@color/solplay_text_primary_dark"
                 android:textColorHint="@color/solplay_text_secondary" />
         </LinearLayout>
 
@@ -137,7 +137,7 @@
                 android:layout_height="wrap_content"
                 android:hint="@string/hint_xtream_server"
                 android:inputType="textUri"
-                android:textColor="@color/solplay_black"
+                android:textColor="@color/solplay_text_primary_dark"
                 android:textColorHint="@color/solplay_text_secondary" />
 
             <TextView
@@ -152,7 +152,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="@string/hint_xtream_username"
-                android:textColor="@color/solplay_black"
+                android:textColor="@color/solplay_text_primary_dark"
                 android:textColorHint="@color/solplay_text_secondary" />
 
             <TextView
@@ -168,7 +168,7 @@
                 android:layout_height="wrap_content"
                 android:hint="@string/hint_xtream_password"
                 android:inputType="textPassword"
-                android:textColor="@color/solplay_black"
+                android:textColor="@color/solplay_text_primary_dark"
                 android:textColorHint="@color/solplay_text_secondary" />
         </LinearLayout>
 

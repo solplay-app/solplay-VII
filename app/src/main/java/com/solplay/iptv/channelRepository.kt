@@ -21,6 +21,12 @@ object ChannelRepository {
     var playingList: List<Channel> = emptyList()
         private set
 
+    /** Chaînes Live à afficher dans la grille EPG (EpgGridActivity), déposées
+     * ici par ChannelsActivity juste avant d'ouvrir cet écran (même
+     * raisonnement que playingList : éviter la limite de taille des Intent). */
+    var epgGridChannels: List<Channel> = emptyList()
+        private set
+
     fun setChannels(newChannels: List<Channel>) {
         channels = newChannels
     }
@@ -29,8 +35,13 @@ object ChannelRepository {
         playingList = list
     }
 
+    fun setEpgGridChannels(list: List<Channel>) {
+        epgGridChannels = list
+    }
+
     fun clear() {
         channels = emptyList()
         playingList = emptyList()
+        epgGridChannels = emptyList()
     }
 }

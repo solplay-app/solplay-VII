@@ -4,17 +4,38 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/solplay_white">
+    android:background="@color/solplay_bg_dark">
 
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
         android:background="@color/solplay_orange"
-        android:padding="16dp"
-        android:text="@string/app_name"
-        android:textColor="@color/solplay_white"
-        android:textSize="20sp"
-        android:textStyle="bold" />
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/app_name"
+            android:textColor="@color/solplay_white"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btnEpgGrid"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📺 Grille TV"
+            android:textColor="@color/solplay_white"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:padding="6dp"
+            android:focusable="true"
+            android:clickable="true" />
+
+    </LinearLayout>
 
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tabLayout"
@@ -22,8 +43,16 @@
         android:layout_height="wrap_content"
         app:tabIndicatorColor="@color/solplay_orange"
         app:tabSelectedTextColor="@color/solplay_orange"
-        app:tabTextColor="@color/solplay_black" />
+        app:tabTextColor="@color/solplay_text_primary_dark" />
 
+    <!-- focusable + focusableInTouchMode explicites : sur beaucoup de box
+         Android TV, un EditText qui n'est pas explicitement déclaré
+         focusable ne peut être atteint qu'au curseur souris/tactile, jamais
+         à la télécommande (D-pad). Le nextFocusDown/Up fixe en plus un
+         chemin de navigation déterministe (tabs -> recherche -> bouquets),
+         car l'algorithme de recherche de focus "au plus proche" d'Android
+         se trompe parfois entre une TabLayout, un EditText pleine largeur
+         et une colonne de bouquets étroite juste en dessous. -->
     <EditText
         android:id="@+id/etSearch"
         android:layout_width="match_parent"
@@ -35,7 +64,11 @@
         android:hint="Rechercher..."
         android:inputType="text"
         android:maxLines="1"
-        android:padding="10dp" />
+        android:padding="10dp"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:nextFocusUp="@id/tabLayout"
+        android:nextFocusDown="@id/recyclerBouquets" />
 
     <TextView
         android:id="@+id/tvEmpty"
@@ -60,7 +93,8 @@
             android:id="@+id/recyclerBouquets"
             android:layout_width="120dp"
             android:layout_height="match_parent"
-            android:background="@color/solplay_gray" />
+            android:background="@color/solplay_gray"
+            android:nextFocusUp="@id/etSearch" />
 
         <View
             android:layout_width="1dp"
@@ -71,7 +105,8 @@
             android:id="@+id/recyclerChannels"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:nextFocusUp="@id/etSearch" />
 
     </LinearLayout>
 
