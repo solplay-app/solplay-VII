@@ -106,18 +106,29 @@ object XtreamApiClient {
         }
     }
 
+    /**
+     * Masque les paramètres `username` et `password` d'une URL avant tout
+     * envoi vers Logcat. Ex: ".../player_api.php?username=john&password=secret123"
+     * devient ".../player_api.php?username=***&password=***". Les vrais
+     * appels réseau utilisent toujours l'URL originale non modifiée ; seule
+     * la version passée à Log.w() doit être masquée.
+     */
+    private fun redactCredentials(url: String): String =
+        url.replace(Regex("(?<=username=)[^&]*"), "***")
+            .replace(Regex("(?<=password=)[^&]*"), "***")
+
     private fun fetchJsonArray(url: String): JSONArray? {
         val request = Request.Builder().url(url).get().build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                Log.w(TAG, "HTTP ${response.code} pour $url")
+                Log.w(TAG, "HTTP ${response.code} pour ${redactCredentials(url)}")
                 return null
             }
             val body = response.body?.string().orEmpty()
             return try {
                 JSONArray(body)
             } catch (e: Exception) {
-                Log.w(TAG, "Réponse JSON inattendue pour $url : ${e.message}")
+                Log.w(TAG, "Réponse JSON inattendue pour ${redactCredentials(url)} : ${e.message}")
                 null
             }
         }
@@ -166,14 +177,14 @@ object XtreamApiClient {
         val request = Request.Builder().url(url).get().build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                Log.w(TAG, "HTTP ${response.code} pour $url")
+                Log.w(TAG, "HTTP ${response.code} pour ${redactCredentials(url)}")
                 return null
             }
             val body = response.body?.string().orEmpty()
             return try {
                 JSONObject(body)
             } catch (e: Exception) {
-                Log.w(TAG, "Réponse JSON inattendue pour $url : ${e.message}")
+                Log.w(TAG, "Réponse JSON inattendue pour ${redactCredentials(url)} : ${e.message}")
                 null
             }
         }

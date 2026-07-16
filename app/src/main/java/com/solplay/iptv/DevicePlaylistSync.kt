@@ -99,5 +99,42 @@ object DevicePlaylistSync {
         } catch (e: Exception) {
             // Silencieux : pas grave si hors-ligne, on retentera à la prochaine ouverture de l'écran.
         }
+    /**
+     * Vérifie qu'une assignation "device:{remoteId}" est TOUJOURS active côté
+     * Firebase, sans réécrire tout le stockage local (contrairement à [sync]).
+     * Utilisé pendant une session déjà ouverte (écran Chaînes, lecteur en
+     * cours) pour couper l'accès dès que l'admin supprime/désactive
+     * l'assignation, au lieu d'attendre le prochain lancement de l'app ou le
+     * prochain passage sur l'écran "Mes playlists" (seuls endroits où [sync]
+     * est actuellement appelé).
+     *
+     * Renvoie true si la playlist n'est pas de type "device:*" (rien à
+     * vérifier), ou en cas d'erreur réseau (on ne coupe jamais l'accès sur un
+     * simple problème de connexion - seulement sur une suppression confirmée).
+     */
+    suspend fun checkStillAssigned(context: Context, tag: String?): Boolean {
+        if (tag == null || !tag.startsWith("device:")) return true
+        val remoteId = tag.removePrefix("device:")
+        val deviceKey = DeviceKeyManager.getDeviceKey(context)
+
+        return try {
+            val snapshot = FirebaseDatabase.getInstance()
+                .getReference("device_playlists")
+                .child(deviceKey)
+                .child(remoteId)
+                .get()
+                .await()
+
+            if (!snapshot.exists()) return false // supprimée côté admin
+
+            val active = snapshot.child("active").getValue(Boolean::class.java) ?: true
+            val expiresAt = snapshot.child("expiresAt").getValue(Long::class.java) ?: 0L
+            val trustedNow = System.currentTimeMillis() + TrialManager.getServerTimeOffsetMillis(context)
+            val expired = expiresAt > 0L && trustedNow >= expiresAt
+
+            active && !expired
+        } catch (e: Exception) {
+            true // hors-ligne/erreur réseau : on ne coupe pas l'accès à tort
+        }
     }
 }

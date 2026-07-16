@@ -82,6 +82,45 @@ class PlayerActivity : AppCompatActivity() {
 
         binding.btnChannelList.setOnClickListener { toggleSidePanel() }
         setupSideSearch()
+        startAssignmentWatcher()
+    }
+
+    /**
+     * Tant que le lecteur est ouvert, revérifie périodiquement (toutes les
+     * 2 minutes) que la playlist assignée par l'admin est toujours active.
+     * Sans ça, une suppression d'assignation pendant que l'utilisateur
+     * regarde déjà une chaîne n'avait AUCUN effet avant la fin de la
+     * session : PlaylistStore.getActiveId()/getAll() ne sont lus qu'une
+     * fois à l'ouverture (setupSidePanel), et ExoPlayer continue de lire un
+     * flux réseau déjà ouvert indépendamment de ce que devient la base
+     * locale ensuite.
+     *
+     * Ne s'applique qu'aux playlists assignées par l'admin ("device:*") -
+     * une playlist que l'utilisateur a lui-même ajoutée n'est jamais coupée
+     * de cette façon.
+     */
+    private var assignmentWatcherJob: Job? = null
+
+    private fun startAssignmentWatcher() {
+        val tag = activePlaylist?.fromCode ?: return
+        if (!tag.startsWith("device:")) return
+
+        assignmentWatcherJob = lifecycleScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(2 * 60 * 1000L)
+                val stillValid = DevicePlaylistSync.checkStillAssigned(this@PlayerActivity, tag)
+                if (!stillValid) {
+                    Toast.makeText(
+                        this@PlayerActivity,
+                        "L'accès à cette playlist a été retiré par l'administrateur.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    player?.stop()
+                    finish()
+                    break
+                }
+            }
+        }
     }
 
     /**

@@ -74,6 +74,33 @@ class ChannelsActivity : AppCompatActivity() {
     }
 
     /**
+     * Si la playlist active a été assignée par l'admin ("device:*") et que
+     * celui-ci l'a désactivée/supprimée pendant que cet écran était en
+     * arrière-plan, on ferme l'écran au retour au lieu de continuer à
+     * servir la liste de chaînes déjà chargée en mémoire (allChannels).
+     * Complète le contrôle périodique équivalent dans PlayerActivity.
+     */
+    override fun onResume() {
+        super.onResume()
+        val playlist = PlaylistStore.getActiveId(this)
+            ?.let { id -> PlaylistStore.getAll(this).firstOrNull { it.id == id } }
+        val tag = playlist?.fromCode
+        if (playlist != null && tag != null && tag.startsWith("device:")) {
+            lifecycleScope.launch {
+                if (!DevicePlaylistSync.checkStillAssigned(this@ChannelsActivity, tag)) {
+                    PlaylistStore.delete(this@ChannelsActivity, playlist.id)
+                    android.widget.Toast.makeText(
+                        this@ChannelsActivity,
+                        "L'accès à cette playlist a été retiré par l'administrateur.",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                    finish()
+                }
+            }
+        }
+    }
+
+    /**
      * Vérifie en tâche de fond si l'abonnement (code M3U/Xtream) est expiré,
      * et affiche une alerte claire si c'est le cas.
      *

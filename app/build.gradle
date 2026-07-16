@@ -98,4 +98,8 @@ dependencies {
 
     // Rappel horaire du temps restant (notification programmée en tâche de fond)
     implementation 'androidx.work:work-runtime-ktx:2.9.1'
+
+    // Stockage chiffré des identifiants (username/password Xtream) enregistrés
+    // localement, au lieu d'un SharedPreferences en clair.
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
 }
