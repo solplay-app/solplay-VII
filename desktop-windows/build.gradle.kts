@@ -100,6 +100,16 @@ val generateBuildConfig by tasks.registering {
 kotlin {
     jvmToolchain(17)
     sourceSets["main"].kotlin.srcDir(generatedBuildConfigDir)
+    // onPointerEvent (utilisé dans PlayerScreen pour détecter l'activité
+    // souris et ré-afficher les contrôles) est marqué @ExperimentalComposeUiApi
+    // par Compose - sans cette autorisation explicite, Kotlin le traite comme
+    // une ERREUR de compilation ("This API is experimental..."), pas juste un
+    // avertissement. C'est ce qui faisait échouer :compileKotlin.
+    sourceSets.all {
+        languageSettings {
+            optIn("androidx.compose.ui.ExperimentalComposeUiApi")
+        }
+    }
 }
 
 tasks.named("compileKotlin") {
