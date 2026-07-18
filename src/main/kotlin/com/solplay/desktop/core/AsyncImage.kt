@@ -69,9 +69,20 @@ fun AsyncImage(
     url: String?,
     contentDescription: String?,
     modifier: Modifier = Modifier,
-    contentScale: ContentScale = ContentScale.Crop
+    // Fit par défaut (image entière visible, avec un léger espace vide sur
+    // les côtés si le ratio ne correspond pas) plutôt que Crop (remplit
+    // tout le cadre en coupant ce qui dépasse) : pour une affiche de film
+    // (portrait), Crop coupait le haut et le bas de l'image - inacceptable
+    // pour une affiche, contrairement à un logo carré où ça passerait
+    // inaperçu. Un appelant peut toujours repasser en Crop explicitement
+    // s'il veut vraiment remplir un cadre carré sans bande vide.
+    contentScale: ContentScale = ContentScale.Fit
 ) {
-    var bitmap by remember(url) { mutableStateOf(ImageCache.cache[url]) }
+    // IMPORTANT : url est nullable (beaucoup de films/séries n'ont pas de
+    // logoUrl dans le M3U) - ConcurrentHashMap interdit les clés null et
+    // plante immédiatement dessus ("Cannot invoke Object.hashCode() because
+    // <parameter1> is null") si on ne filtre pas avant d'aller lire le cache.
+    var bitmap by remember(url) { mutableStateOf(url?.let { ImageCache.cache[it] }) }
     var failed by remember(url) { mutableStateOf(false) }
 
     LaunchedEffect(url) {

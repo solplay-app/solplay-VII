@@ -11,6 +11,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusTarget
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -64,6 +72,13 @@ fun EpgGridScreen(
     val hScroll = rememberScrollState()
     val vScroll = rememberScrollState()
     val sdf = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+    val scope = rememberCoroutineScope()
+    val gridFocusRequester = remember { FocusRequester() }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val rowHeightPx = with(density) { ROW_HEIGHT_DP.dp.toPx() }
+    val slotWidthPx = with(density) { SLOT_WIDTH_DP.dp.toPx() }
+
+    LaunchedEffect(Unit) { gridFocusRequester.requestFocus() }
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -107,7 +122,33 @@ fun EpgGridScreen(
             // temporelle) et verticalement (synchronisé avec la colonne des
             // noms via le même vScroll).
             Column(
-                Modifier.weight(1f).horizontalScroll(hScroll).verticalScroll(vScroll)
+                Modifier.weight(1f)
+                    .horizontalScroll(hScroll)
+                    .verticalScroll(vScroll)
+                    .focusRequester(gridFocusRequester)
+                    .focusTarget()
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when (event.key) {
+                            Key.DirectionDown -> {
+                                scope.launch { vScroll.animateScrollTo((vScroll.value + rowHeightPx).toInt()) }
+                                true
+                            }
+                            Key.DirectionUp -> {
+                                scope.launch { vScroll.animateScrollTo((vScroll.value - rowHeightPx).toInt()) }
+                                true
+                            }
+                            Key.DirectionRight -> {
+                                scope.launch { hScroll.animateScrollTo((hScroll.value + slotWidthPx).toInt()) }
+                                true
+                            }
+                            Key.DirectionLeft -> {
+                                scope.launch { hScroll.animateScrollTo((hScroll.value - slotWidthPx).toInt()) }
+                                true
+                            }
+                            else -> false
+                        }
+                    }
             ) {
                 Row(Modifier.height(HEADER_HEIGHT_DP.dp)) {
                     repeat(slotCount) { i ->

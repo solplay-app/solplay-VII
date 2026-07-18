@@ -5,12 +5,22 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -150,13 +160,23 @@ fun HomeScreen(
 
     fun handleClick(channel: Channel) {
         when (currentType) {
-            ContentType.LIVE -> onPlay(channel.streamUrl, channel.name)
+            ContentType.LIVE -> {
+                // Alimente ChannelRepository.playingList (liste actuellement
+                // affichée - filtrée par bouquet/recherche) AVANT d'ouvrir le
+                // lecteur : c'est cette liste que PlayerScreen utilise pour
+                // son panneau "☰ Chaînes" (changer de chaîne sans revenir en
+                // arrière). Même principe que ChannelsActivity côté Android.
+                com.solplay.iptv.ChannelRepository.setPlayingList(filtered)
+                onPlay(channel.streamUrl, channel.name)
+            }
             ContentType.MOVIE -> ficheChannel = channel
             ContentType.SERIES -> {
                 if (XtreamApiClient.isSeriesShell(channel)) openSeriesEpisodes(channel) else ficheChannel = channel
             }
         }
     }
+
+    var showAbout by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         revokedMessage?.let { msg ->
@@ -179,12 +199,19 @@ fun HomeScreen(
                 }
                 Spacer(Modifier.width(8.dp))
             }
+            IconButton(onClick = { showAbout = true }) {
+                Icon(Icons.Filled.Info, contentDescription = "À propos")
+            }
             TextButton(onClick = {
                 PlaylistStore.setActiveId(context, null)
                 onDisconnect()
             }) { Text("Changer de compte") }
         }
         Spacer(Modifier.height(12.dp))
+
+        if (showAbout) {
+            AboutDialog(context = context, onDismiss = { showAbout = false })
+        }
 
         TabRow(selectedTabIndex = currentType.ordinal) {
             Tab(selected = currentType == ContentType.LIVE, onClick = { currentType = ContentType.LIVE; currentBouquet = ALL_BOUQUETS }, text = { Text("Live") })
@@ -201,14 +228,50 @@ fun HomeScreen(
         )
         Spacer(Modifier.height(12.dp))
 
-        Row(Modifier.horizontalScroll(rememberScrollState())) {
-            bouquets.forEach { b ->
+        // Rangée des bouquets : navigable au clavier (flèches gauche/droite),
+        // ce qui n'existait pas du tout avant - seul le clic souris changeait
+        // le bouquet sélectionné. Même principe que la LazyColumn des
+        // chaînes juste en dessous (FocusRequester + onPreviewKeyEvent).
+        val bouquetListState = rememberLazyListState()
+        val bouquetFocusRequester = remember { FocusRequester() }
+        val bouquetIndex = remember(bouquets, currentBouquet) {
+            bouquets.indexOfFirst { it.name == currentBouquet }.coerceAtLeast(0)
+        }
+
+        LazyRow(
+            state = bouquetListState,
+            modifier = Modifier
+                .focusRequester(bouquetFocusRequester)
+                .focusTarget()
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.DirectionRight -> {
+                            val next = (bouquetIndex + 1).coerceAtMost(bouquets.lastIndex)
+                            currentBouquet = bouquets[next].name
+                            scope.launch { bouquetListState.animateScrollToItem(next) }
+                            true
+                        }
+                        Key.DirectionLeft -> {
+                            val prev = (bouquetIndex - 1).coerceAtLeast(0)
+                            currentBouquet = bouquets[prev].name
+                            scope.launch { bouquetListState.animateScrollToItem(prev) }
+                            true
+                        }
+                        else -> false
+                    }
+                }
+        ) {
+            itemsIndexed(bouquets) { _, b ->
                 FilterChip(
                     selected = currentBouquet == b.name,
-                    onClick = { currentBouquet = b.name },
-                    label = { Text("${b.name} (${b.channelCount})") }
+                    onClick = {
+                        currentBouquet = b.name
+                        bouquetFocusRequester.requestFocus()
+                    },
+                    label = { Text("${b.name} (${b.channelCount})") },
+                    modifier = Modifier.padding(end = 6.dp)
                 )
-                Spacer(Modifier.width(6.dp))
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -220,16 +283,16 @@ fun HomeScreen(
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("Aucun résultat.", color = MaterialTheme.colorScheme.outline)
             }
-        } else {
+        } else if (currentType == ContentType.LIVE) {
             val listState = rememberLazyListState()
             val listFocusRequester = remember { FocusRequester() }
 
-            // Focus automatique au premier affichage : sans ça, les flèches
-            // du clavier ne font rien tant que l'utilisateur n'a pas cliqué
-            // manuellement dans la liste au moins une fois (comportement Compose
-            // par défaut : un composant ne reçoit les événements clavier que
-            // s'il a le focus).
-            LaunchedEffect(currentType, currentBouquet) {
+            // Focus automatique au changement d'onglet (Live/Films/Séries)
+            // uniquement - PAS à chaque changement de bouquet, sinon le focus
+            // clavier repartait vers cette liste après une seule flèche
+            // gauche/droite sur la rangée des bouquets, empêchant d'enchaîner
+            // plusieurs appuis flèche de suite pour naviguer entre eux.
+            LaunchedEffect(currentType) {
                 listFocusRequester.requestFocus()
             }
 
@@ -252,11 +315,15 @@ fun HomeScreen(
                                 scope.launch { listState.animateScrollToItem((index - 1).coerceAtLeast(0)) }
                                 true
                             }
-                            Key.PageDown -> {
+                            // Liste à une seule colonne : gauche/droite n'ont pas de
+                            // cible latérale évidente, donc on les fait sauter d'une
+                            // "page" (comme Page Haut/Bas) plutôt que de les laisser
+                            // sans effet - toutes les listes doivent réagir aux 4 flèches.
+                            Key.DirectionRight, Key.PageDown -> {
                                 scope.launch { listState.animateScrollToItem((index + 10).coerceAtMost(filtered.lastIndex)) }
                                 true
                             }
-                            Key.PageUp -> {
+                            Key.DirectionLeft, Key.PageUp -> {
                                 scope.launch { listState.animateScrollToItem((index - 10).coerceAtLeast(0)) }
                                 true
                             }
@@ -268,7 +335,7 @@ fun HomeScreen(
                     ListItem(
                         leadingContent = {
                             Box(Modifier.size(48.dp).clip(RoundedCornerShape(6.dp))) {
-                                AsyncImage(channel.logoUrl, channel.name, Modifier.fillMaxSize())
+                                AsyncImage(channel.logoUrl, channel.name, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
                             }
                         },
                         headlineContent = { Text(channel.name) },
@@ -281,6 +348,83 @@ fun HomeScreen(
                         modifier = Modifier.clickable { handleClick(channel) }
                     )
                     Divider()
+                }
+            }
+        } else {
+            // Films / Séries : grille d'affiches classée (colonnes), plutôt
+            // que la liste brute utilisée pour le Live - beaucoup plus
+            // lisible pour parcourir un catalogue VOD, et cohérent avec ce
+            // qu'affichent la plupart des apps IPTV pour ce type de contenu.
+            val gridColumns = 5
+            val gridState = rememberLazyGridState()
+            val gridFocusRequester = remember { FocusRequester() }
+
+            LaunchedEffect(currentType) {
+                gridFocusRequester.requestFocus()
+            }
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(gridColumns),
+                state = gridState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .focusRequester(gridFocusRequester)
+                    .focusTarget()
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        val index = gridState.firstVisibleItemIndex
+                        when (event.key) {
+                            Key.DirectionRight -> {
+                                scope.launch { gridState.animateScrollToItem((index + 1).coerceAtMost(filtered.lastIndex)) }
+                                true
+                            }
+                            Key.DirectionLeft -> {
+                                scope.launch { gridState.animateScrollToItem((index - 1).coerceAtLeast(0)) }
+                                true
+                            }
+                            Key.DirectionDown -> {
+                                scope.launch { gridState.animateScrollToItem((index + gridColumns).coerceAtMost(filtered.lastIndex)) }
+                                true
+                            }
+                            Key.DirectionUp -> {
+                                scope.launch { gridState.animateScrollToItem((index - gridColumns).coerceAtLeast(0)) }
+                                true
+                            }
+                            else -> false
+                        }
+                    },
+                contentPadding = PaddingValues(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                gridItems(filtered, key = { it.streamUrl }) { channel: Channel ->
+                    Column(
+                        modifier = Modifier
+                            .clickable { handleClick(channel) }
+                            .fillMaxWidth()
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(2f / 3f)
+                                .clip(RoundedCornerShape(8.dp))
+                        ) {
+                            AsyncImage(
+                                channel.logoUrl,
+                                channel.name,
+                                Modifier.fillMaxSize(),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            channel.name,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }
@@ -315,15 +459,55 @@ fun HomeScreen(
                         Text("Chargement des épisodes…")
                     }
                     episodes.isEmpty() -> Text("Aucun épisode trouvé pour cette série.")
-                    else -> LazyColumn(Modifier.heightIn(max = 400.dp)) {
-                        items(episodes, key = { it.streamUrl }) { episode ->
-                            ListItem(
-                                headlineContent = { Text(episode.name) },
-                                modifier = Modifier.clickable {
-                                    episodesDialogFor = null
-                                    onPlay(episode.streamUrl, episode.name)
+                    else -> {
+                        // Liste d'épisodes elle aussi navigable aux 4 flèches, comme
+                        // toutes les autres listes de l'app (même principe que la
+                        // LazyColumn des chaînes et la LazyVerticalGrid films/séries
+                        // ci-dessus : FocusRequester + onPreviewKeyEvent).
+                        val episodesListState = rememberLazyListState()
+                        val episodesFocusRequester = remember { FocusRequester() }
+                        LaunchedEffect(series) { episodesFocusRequester.requestFocus() }
+
+                        LazyColumn(
+                            state = episodesListState,
+                            modifier = Modifier
+                                .heightIn(max = 400.dp)
+                                .focusRequester(episodesFocusRequester)
+                                .focusTarget()
+                                .onPreviewKeyEvent { event ->
+                                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                                    val index = episodesListState.firstVisibleItemIndex
+                                    when (event.key) {
+                                        Key.DirectionDown -> {
+                                            scope.launch { episodesListState.animateScrollToItem((index + 1).coerceAtMost(episodes.lastIndex)) }
+                                            true
+                                        }
+                                        Key.DirectionUp -> {
+                                            scope.launch { episodesListState.animateScrollToItem((index - 1).coerceAtLeast(0)) }
+                                            true
+                                        }
+                                        Key.DirectionRight, Key.PageDown -> {
+                                            scope.launch { episodesListState.animateScrollToItem((index + 10).coerceAtMost(episodes.lastIndex)) }
+                                            true
+                                        }
+                                        Key.DirectionLeft, Key.PageUp -> {
+                                            scope.launch { episodesListState.animateScrollToItem((index - 10).coerceAtLeast(0)) }
+                                            true
+                                        }
+                                        else -> false
+                                    }
                                 }
-                            )
+                        ) {
+                            items(episodes, key = { it.streamUrl }) { episode ->
+                                ListItem(
+                                    headlineContent = { Text(episode.name) },
+                                    modifier = Modifier.clickable {
+                                        com.solplay.iptv.ChannelRepository.setPlayingList(episodes)
+                                        episodesDialogFor = null
+                                        onPlay(episode.streamUrl, episode.name)
+                                    }
+                                )
+                            }
                         }
                     }
                 }

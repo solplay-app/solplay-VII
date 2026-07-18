@@ -40,17 +40,17 @@ fun VlcMissingScreen(onVlcFound: () -> Unit) {
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Color(0xFF111318)), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(SolPlayColors.Black), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.widthIn(max = 480.dp).padding(24.dp)
         ) {
-            Text("VLC Media Player requis", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text("VLC Media Player requis", color = SolPlayColors.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
             Text(
                 "SolPlay utilise VLC pour lire les chaînes, films et séries. " +
                     "Il n'a pas été détecté sur cet ordinateur. C'est gratuit et l'installation prend 2 minutes.",
-                color = Color.White.copy(alpha = 0.75f),
+                color = SolPlayColors.White.copy(alpha = 0.75f),
                 textAlign = TextAlign.Center
             )
             Spacer(Modifier.height(24.dp))
@@ -65,7 +65,7 @@ fun VlcMissingScreen(onVlcFound: () -> Unit) {
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "Impossible d'ouvrir le navigateur automatiquement. Copiez ce lien :\n${VlcCheck.DOWNLOAD_URL}",
-                    color = Color.White.copy(alpha = 0.75f),
+                    color = SolPlayColors.White.copy(alpha = 0.75f),
                     textAlign = TextAlign.Center,
                     fontSize = 12.sp
                 )

@@ -143,6 +143,13 @@ object TrialManager {
 
     /** Millisecondes restantes sur la licence payante (0 si expirée ou sans licence). */
     fun getRemainingLicenseMillis(context: Context): Long {
+        // On vérifie d'abord isLicensed() (qui contrôle le flag KEY_LICENSED
+        // ET l'expiration) : sans ce contrôle, un appareil jamais licencié
+        // (expiresAt == 0L par défaut) se voyait renvoyer Long.MAX_VALUE
+        // ("illimité") au lieu de 0 — sans impact concret aujourd'hui, car
+        // aucun appel actuel n'atteint ce chemin sans licence active, mais
+        // un bug latent si ce champ est réutilisé ailleurs plus tard.
+        if (!isLicensed(context)) return 0L
         val expiresAt = getLicenseExpiresAt(context)
         if (expiresAt == 0L) return Long.MAX_VALUE // licence sans expiration
         return (expiresAt - trustedNow(context)).coerceAtLeast(0)

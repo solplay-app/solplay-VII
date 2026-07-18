@@ -6,8 +6,28 @@ plugins {
     kotlin("plugin.serialization") version "1.9.24"
 }
 
+// Numéro de version qui change à CHAQUE build sur GitHub Actions (via la
+// variable GITHUB_RUN_NUMBER, fournie automatiquement par GitHub, incrémentée
+// à chaque exécution du workflow - aucune configuration supplémentaire
+// nécessaire côté repo).
+//
+// C'est important : Windows Installer (.msi) se base sur ce numéro pour
+// savoir s'il doit remplacer une installation existante. S'il reste identique
+// d'un build à l'autre (ex: "1.0.0" codé en dur), Windows considère souvent
+// que la version "est déjà installée" et ne remplace rien du tout, même si
+// le contenu a réellement changé - symptôme typique : "j'installe la
+// nouvelle version mais rien ne change", alors que le nouveau code est
+// pourtant bien présent dans l'installeur généré.
+//
+// En local (pas de CI), retombe sur "1.0.0" - si tu testes des installations
+// répétées en local, augmente ce nombre à la main ou désinstalle l'ancienne
+// version depuis "Applications et fonctionnalités" avant de réinstaller.
+val appVersion = providers.environmentVariable("GITHUB_RUN_NUMBER")
+    .map { "1.0.$it" }
+    .getOrElse("1.0.0")
+
 group = "com.solplay.desktop"
-version = "1.0.0"
+version = appVersion
 
 repositories {
     google()
@@ -93,14 +113,17 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             packageName = "SolPlay"
-            packageVersion = "1.0.0"
+            packageVersion = appVersion
             windows {
                 menuGroup = "SolPlay"
                 // upgradeUuid figé pour que les mises à jour MSI remplacent
                 // proprement l'installation précédente au lieu d'en créer une seconde.
                 upgradeUuid = "8f2c9b3a-6e2d-4a1b-9c3e-1d7f5a2b8e40"
-                // Ajoute ton propre .ico ici si tu veux une icône personnalisée :
-                // iconFile.set(project.file("src/main/resources/solplay.ico"))
+                // Icône de l'app (identique à celle de la version Android),
+                // convertie en .ico multi-résolutions (16 à 256px) à partir du
+                // logo source. Utilisée pour l'exécutable, le raccourci du
+                // menu Démarrer, et l'installeur .msi lui-même.
+                iconFile.set(project.file("src/main/resources/solplay.ico"))
             }
         }
     }
