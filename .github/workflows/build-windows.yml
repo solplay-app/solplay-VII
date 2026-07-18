@@ -1,0 +1,80 @@
+name: Build Windows installer
+
+# Se déclenche automatiquement en poussant un tag "v*" (ex. v1.0.0), et peut
+# aussi être lancé manuellement depuis l'onglet "Actions" du dépôt GitHub.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    # ⚠️ À AJUSTER : nom du sous-dossier où vit ce projet desktop dans le
+    # dépôt "solplay-VII" (celui de ton app Android). Ce workflow suppose
+    # qu'il est placé dans un sous-dossier (ex. "desktop-windows/") plutôt
+    # qu'à la racine du dépôt, pour ne pas entrer en conflit avec le projet
+    # Android (son propre build.gradle/settings.gradle à la racine).
+    # Change juste cette valeur si tu choisis un autre nom de dossier.
+    defaults:
+      run:
+        working-directory: desktop-windows
+        shell: bash
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Installation du JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Ce projet n'a pas (encore) de wrapper Gradle committé (gradlew /
+      # gradlew.bat / gradle/wrapper/...). Plutôt que d'en committer un
+      # binaire, on installe Gradle directement via l'action officielle.
+      # Si tu ajoutes un wrapper plus tard (`gradle wrapper` en local puis
+      # commit), tu pourras remplacer les étapes "gradle ..." ci-dessous par
+      # "./gradlew ..." et retirer cette étape.
+      - name: Installation de Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
+      # Le secret TMDB_API_KEY doit être créé dans :
+      # Réglages du dépôt -> Secrets and variables -> Actions -> New repository secret
+      # (nom exact : TMDB_API_KEY). Sans lui, le build réussit quand même,
+      # simplement sans affiches TMDB dans l'app (voir build.gradle.kts).
+      - name: Build de l'installeur Windows (.msi + .exe)
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: gradle packageDistributionForCurrentOS --no-daemon
+
+      - name: Upload de l'installeur comme artefact du build
+        uses: actions/upload-artifact@v4
+        with:
+          name: solplay-windows-installers
+          path: |
+            desktop-windows/build/compose/binaries/main/msi/*.msi
+            desktop-windows/build/compose/binaries/main/exe/*.exe
+
+      # Ne s'exécute que sur un vrai tag (ex. v1.2.0), pas sur un lancement
+      # manuel : crée/complète la release GitHub et y attache l'installeur -
+      # c'est cette release que UpdateChecker.kt interroge ensuite pour
+      # savoir si une mise à jour est disponible. Comme le dépôt est partagé
+      # avec l'app Android, cette release peut aussi déjà contenir l'APK
+      # (les deux fichiers cohabitent dans la même release sans problème :
+      # UpdateChecker.kt d'Android cherche un .apk, celui du desktop
+      # cherche un .msi/.exe - chacun ignore le fichier de l'autre).
+      - name: Publication sur la release GitHub
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            desktop-windows/build/compose/binaries/main/msi/*.msi
+            desktop-windows/build/compose/binaries/main/exe/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
