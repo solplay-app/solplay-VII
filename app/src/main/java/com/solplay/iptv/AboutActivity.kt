@@ -96,6 +96,7 @@ class AboutActivity : AppCompatActivity() {
             }
             .setNegativeButton("Annuler", null)
             .show()
+    }
 
     /**
      * Affiche un dialogue plein-écran avec le QR Code de la clé appareil.
@@ -198,4 +199,3 @@ class AboutActivity : AppCompatActivity() {
         }
     }
 }
-
