@@ -13,7 +13,7 @@ object CodeRedeemer {
 
     /**
      * Vérifie en ligne si le code existe et est actif (nœud Firebase
-     * "playlist_codes/{code}", géré depuis admin_panel.html), et construit
+     * "playlist_codes/{code}", géré depuis founction netlify/index.html), et construit
      * la playlist correspondante si oui.
      */
     suspend fun redeem(code: String): RedeemResult {

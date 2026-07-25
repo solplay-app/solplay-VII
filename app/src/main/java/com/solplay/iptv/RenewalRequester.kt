@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
  * Envoie une demande de renouvellement d'abonnement depuis l'appareil client
  * vers Firebase Realtime Database (nœud `renewal_requests/`).
  *
- * L'administrateur voit ces demandes dans son tableau de bord admin_panel.html
+ * L'administrateur voit ces demandes dans son tableau de bord founction netlify/index.html
  * et peut les approuver en un clic — sans avoir à saisir la clé appareil
  * manuellement, sans échange WhatsApp pour le renouvellement.
  *

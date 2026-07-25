@@ -20,7 +20,7 @@ import kotlin.coroutines.resume
  * L'activation Pro fonctionne via Firebase Realtime Database :
  * 1. L'app génère une "clé appareil" unique (voir DeviceKeyManager).
  * 2. Le client envoie cette clé à l'administrateur (email/WhatsApp).
- * 3. L'administrateur active cette clé depuis le panneau admin (admin_panel.html)
+ * 3. L'administrateur active cette clé depuis le panneau admin (founction netlify/index.html)
  *    en choisissant une durée (test en heures, ou abonnement en mois).
  * 4. L'app vérifie en ligne le statut de cette clé, mémorise la date
  *    d'expiration localement et fonctionne ensuite hors-ligne jusqu'à expiration.
