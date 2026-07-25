@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SOLPLAY</string>
+    <string name="tagline">Votre lecteur IPTV nouvelle génération</string>
+
+    <string name="update_available_title">Nouvelle version disponible</string>
+    <string name="update_available_message">La version %1$s de SOLPLAY est disponible. Voulez-vous la télécharger maintenant ?</string>
+    <string name="update_download">Télécharger</string>
+    <string name="update_later">Plus tard</string>
+
+    <string name="contact_email">stephanegue2018@gmail.com</string>
+    <string name="contact_phone">+225 05 03 06 69 12</string>
+
+    <!-- Numéro utilisé uniquement pour construire le lien WhatsApp (wa.me),
+         jamais affiché tel quel à l'écran. Format international, sans le +. -->
+    <string name="whatsapp_phone_international">2250503067912</string>
+
+    <string name="trial_hours">24</string>
+    <string name="trial_active_format">Essai gratuit : %1$s restant(s)</string>
+    <string name="trial_expired_title">Votre essai gratuit de 24h est terminé</string>
+
+    <string name="license_active_format">Version Pro active — expire le %1$s\n(%2$s restant)</string>
+    <string name="license_active_unlimited">Version Pro active (sans expiration)</string>
+
+    <string name="access_blocked_title">🔒 Activation requise</string>
+    <string name="access_blocked_message">Cette application nécessite une activation.\n\nEnvoyez votre clé appareil ci-dessous à votre revendeur afin de souscrire à un abonnement (1, 3, 6 ou 12 mois).\n\nUne fois votre abonnement activé par le revendeur, cet écran se met à jour automatiquement — inutile de rouvrir l\'application.</string>
+
+    <string name="btn_whatsapp_contact">Contacter le revendeur</string>
+
+    <string name="btn_activate_pro">Activer la version Pro</string>
+    <string name="btn_continue_trial">Accéder à l\'application</string>
+    <string name="btn_contact_us">Nous contacter pour acheter</string>
+
+    <string name="hint_playlist_url">Lien de la playlist M3U</string>
+    <string name="hint_playlist_name">Nom de la playlist (ex: Ma Playlist)</string>
+    <string name="btn_load_playlist">Charger la playlist</string>
+
+    <string name="mode_m3u">Lien M3U</string>
+    <string name="mode_xtream">Xtream Codes</string>
+    <string name="hint_xtream_server">Serveur (ex: http://exemple.com:8080)</string>
+    <string name="hint_xtream_username">Nom d\'utilisateur</string>
+    <string name="hint_xtream_password">Mot de passe</string>
+
+    <string name="hint_license_code">Entrez votre code d\'activation Pro</string>
+    <string name="btn_activate">Activer</string>
+    <string name="license_invalid">Code invalide. Contactez-nous pour obtenir votre code.</string>
+    <string name="license_success">Version Pro activée. Merci de votre confiance !</string>
+
+    <string name="about_title">À propos de SOLPLAY</string>
+
+    <string name="device_key_format">%1$s</string>
+
+    <string name="legal_disclaimer_text">SOLPLAY est une application de lecture multimédia (lecteur de flux IPTV), au même titre qu\'un lecteur vidéo classique. SOLPLAY ne vend, n\'héberge et ne fournit aucune chaîne de télévision, aucun contenu audiovisuel ni aucun flux vidéo.\n\nL\'application permet uniquement de lire les playlists ou les accès que vous configurez vous-même, à partir de votre propre fournisseur.\n\nIl est de votre entière responsabilité de vérifier que votre fournisseur dispose des autorisations de diffusion nécessaires. Nous vous recommandons de privilégier exclusivement des fournisseurs IPTV agréés et légalement autorisés à diffuser du contenu.\n\nSOLPLAY décline toute responsabilité quant à l\'usage fait de l\'application par ses utilisateurs.</string>
+
+</resources>
