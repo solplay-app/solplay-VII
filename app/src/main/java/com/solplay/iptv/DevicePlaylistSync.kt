@@ -17,8 +17,20 @@ import java.util.UUID
  */
 object DevicePlaylistSync {
 
-    suspend fun sync(context: Context) {
+    private const val PREFS = "solplay_prefs"
+    private const val KEY_FORCE_CONNECT_PREFIX = "force_connect_handled_"
+
+    /**
+     * @return l'id LOCAL (PlaylistStore) de la playlist que l'admin vient de
+     * forcer à reconnecter depuis son espace (bouton "🔌 Connecter" sur
+     * l'assignation), ou null si aucune reconnexion forcée n'est en attente.
+     * L'appelant (PlaylistsListActivity) doit alors relancer connect() sur
+     * cette playlist même si elle est déjà active, pour recharger ses
+     * identifiants/chaînes à jour.
+     */
+    suspend fun sync(context: Context): String? {
         val deviceKey = DeviceKeyManager.getDeviceKey(context)
+        var forceReconnectLocalId: String? = null
         try {
             val snapshot = FirebaseDatabase.getInstance()
                 .getReference("device_playlists")
@@ -27,6 +39,7 @@ object DevicePlaylistSync {
                 .await()
 
             val existing = PlaylistStore.getAll(context)
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
             // Tags ("device:remoteId") des assignations encore actives et non
             // expirées après ce passage - sert à nettoyer en fin de fonction
@@ -84,6 +97,16 @@ object DevicePlaylistSync {
                         )
                     }
                     PlaylistStore.save(context, playlist)
+
+                    // L'admin a-t-il cliqué "🔌 Connecter" depuis son espace
+                    // depuis la dernière fois qu'on a traité ce champ ici ?
+                    val forceConnectAt = child.child("forceConnectAt").getValue(Long::class.java) ?: 0L
+                    val handledKey = KEY_FORCE_CONNECT_PREFIX + remoteId
+                    val lastHandled = prefs.getLong(handledKey, 0L)
+                    if (forceConnectAt > lastHandled) {
+                        prefs.edit().putLong(handledKey, forceConnectAt).apply()
+                        forceReconnectLocalId = playlist.id
+                    }
                 }
             }
 
@@ -99,6 +122,7 @@ object DevicePlaylistSync {
         } catch (e: Exception) {
             // Silencieux : pas grave si hors-ligne, on retentera à la prochaine ouverture de l'écran.
         }
+        return forceReconnectLocalId
     }
 
     /**

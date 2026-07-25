@@ -48,18 +48,25 @@ class PlaylistsListActivity : AppCompatActivity() {
     // peut pas se connecter lui-même se retrouve connecté simplement en
     // rouvrant l'app - l'admin gère tout depuis son espace.
     lifecycleScope.launch {
-        DevicePlaylistSync.sync(this@PlaylistsListActivity)
+        val forceReconnectId = DevicePlaylistSync.sync(this@PlaylistsListActivity)
         refresh()
 
         val activeId = PlaylistStore.getActiveId(this@PlaylistsListActivity)
         val deviceAssigned = PlaylistStore.getAll(this@PlaylistsListActivity)
             .filter { it.fromCode?.startsWith("device:") == true }
 
-        // Un seul compte assigné par l'admin, pas encore actif sur cet
-        // appareil (nouvelle assignation, ou admin a changé les identifiants
-        // depuis son espace) : connexion automatique silencieuse.
-        if (deviceAssigned.size == 1 && deviceAssigned.first().id != activeId) {
-            connect(deviceAssigned.first(), silent = true)
+        val forcedTarget = deviceAssigned.firstOrNull { it.id == forceReconnectId }
+        when {
+            // L'admin a explicitement cliqué "🔌 Connecter" sur cette
+            // assignation depuis son espace : on force le rechargement même
+            // si c'était déjà la playlist active (identifiants à jour, etc.).
+            forcedTarget != null -> connect(forcedTarget, silent = true)
+
+            // Un seul compte assigné par l'admin, pas encore actif sur cet
+            // appareil (nouvelle assignation, ou admin a changé les
+            // identifiants depuis son espace) : connexion automatique silencieuse.
+            deviceAssigned.size == 1 && deviceAssigned.first().id != activeId ->
+                connect(deviceAssigned.first(), silent = true)
         }
     }
 }
