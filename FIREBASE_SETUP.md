@@ -71,18 +71,21 @@ affiche maintenant le code d'erreur exact (ex: `PERMISSION_DENIED`) directement
 3. Onglet "Users" → "Add user" → crée ton compte admin (email + mot de passe)
    — c'est ce compte qui te servira à te connecter au panneau admin
 
-## 4. Configurer le panneau admin (admin_panel.html)
+## 4. Configurer le panneau admin (founction netlify/index.html)
 
-1. Ouvre le fichier `admin_panel.html` (fourni séparément) avec un éditeur
-   de texte
+1. Ouvre le fichier `founction netlify/index.html` avec un éditeur de texte
+   (c'est le seul panneau admin du projet — `admin_panel.html` a été
+   supprimé car obsolète)
 2. Dans Firebase, va dans "Paramètres du projet" (roue crantée) → fais
    défiler jusqu'à "Vos applications" → clique sur l'app Web (ou crée-en une
    avec l'icône `</>` si elle n'existe pas) → copie le bloc `firebaseConfig`
-3. Colle ce bloc dans `admin_panel.html` à l'endroit indiqué
+3. Colle ce bloc dans `founction netlify/index.html` à l'endroit indiqué
    (`// COLLE TA CONFIGURATION FIREBASE ICI`)
-4. Ouvre ce fichier HTML dans un navigateur (double-clic dessus, ou héberge-le
-   sur GitHub Pages/Netlify pour y accéder de partout) → connecte-toi avec
-   ton compte admin créé à l'étape 3
+4. Déploie le dossier `founction netlify/` sur Netlify (glisser-déposer sur
+   app.netlify.com, ou `netlify deploy`) — c'est nécessaire pour que
+   `netlify/functions/send-notification.js` fonctionne (l'ouvrir en local en
+   double-cliquant dessus marche pour le reste, mais pas pour l'envoi de
+   notifications) → connecte-toi avec ton compte admin créé à l'étape 3
 
 ## 5. Comment ça fonctionne pour toi au quotidien
 
