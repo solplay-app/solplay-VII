@@ -1,90 +1,64 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    Écran d'accueil "grille" façon TV Smarters (mêmes proportions : 3 grandes
-    tuiles dégradées Live/Films/Séries en haut, actions secondaires en pilule
-    en dessous, barre du haut avec nom + horloge + icônes, ligne d'infos
-    compte en bas) - mais avec le nom et les couleurs de marque SolPlay
-    (orange @color/solplay_orange et vert @color/solplay_green) intactes.
--->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/bg_home_screen">
 
-    <!-- Barre du haut : nom de l'app, horloge, icônes Compte / Réglages -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="26dp"
+        android:background="@color/solplay_orange" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="20dp"
-        android:paddingEnd="16dp"
+        android:paddingStart="22dp"
+        android:paddingEnd="22dp"
         android:paddingTop="18dp"
         android:paddingBottom="10dp">
 
-        <LinearLayout
-            android:layout_width="0dp"
+        <ImageView
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:layout_marginEnd="14dp"
+            android:src="@drawable/ic_solplay_logo"
+            android:contentDescription="SOLPLAY" />
+
+        <TextView
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:layout_marginEnd="8dp"
-                android:src="@drawable/ic_solplay_logo"
-                android:contentDescription="@string/app_name" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Sol"
-                android:textColor="@color/solplay_orange"
-                android:textSize="22sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Play"
-                android:textColor="@color/solplay_white"
-                android:textSize="22sp"
-                android:textStyle="bold" />
-
-        </LinearLayout>
+            android:text="SOLPLAY"
+            android:textColor="@color/solplay_white"
+            android:textStyle="bold"
+            android:textSize="23sp" />
 
         <TextView
             android:id="@+id/tvClock"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="16dp"
-            android:text="--:--"
+            android:layout_weight="1"
+            android:gravity="end"
+            android:text=""
             android:textColor="@color/solplay_white"
-            android:textSize="16sp" />
+            android:textSize="1sp"
+            android:visibility="gone" />
 
         <LinearLayout
             android:id="@+id/tileAccount"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="10dp"
-            android:gravity="center"
-            android:background="@drawable/bg_icon_circle"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:background="@android:color/transparent"
             android:clickable="true"
-            android:focusable="true">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="👤"
-                android:textSize="18sp" />
-        </LinearLayout>
+            android:focusable="true"
+            android:visibility="gone" />
 
         <LinearLayout
             android:id="@+id/tileSettings"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:gravity="center"
             android:background="@drawable/bg_icon_circle"
             android:clickable="true"
@@ -94,243 +68,218 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="⚙"
-                android:textSize="18sp" />
+                android:textSize="15sp" />
         </LinearLayout>
-
     </LinearLayout>
 
-    <!-- Contenu central : occupe tout l'espace disponible -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:orientation="vertical"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:gravity="center_vertical">
+        android:paddingStart="22dp"
+        android:paddingEnd="22dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
 
-        <!-- Rangée des 3 grandes tuiles dégradées -->
         <LinearLayout
+            android:id="@+id/tileLiveTv"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="3"
-            android:orientation="horizontal">
-
-            <LinearLayout
-                android:id="@+id/tileLiveTv"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_margin="8dp"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:background="@drawable/bg_home_tile_live"
-                android:clickable="true"
-                android:focusable="true">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="📺"
-                    android:textSize="40sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="LIVE"
-                    android:textColor="@color/solplay_white"
-                    android:textStyle="bold"
-                    android:textSize="16sp"
-                    android:letterSpacing="0.05" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/tileMovies"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_margin="8dp"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:background="@drawable/bg_home_tile_movies"
-                android:clickable="true"
-                android:focusable="true">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="🎬"
-                    android:textSize="40sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="FILMS"
-                    android:textColor="@color/solplay_white"
-                    android:textStyle="bold"
-                    android:textSize="16sp"
-                    android:letterSpacing="0.05" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/tileSeries"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_margin="8dp"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:background="@drawable/bg_home_tile_series"
-                android:clickable="true"
-                android:focusable="true">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="🎞"
-                    android:textSize="40sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="SÉRIES"
-                    android:textColor="@color/solplay_white"
-                    android:textStyle="bold"
-                    android:textSize="16sp"
-                    android:letterSpacing="0.05" />
-            </LinearLayout>
-
-        </LinearLayout>
-
-        <!-- Rangée compacte de 3 pilules, façon modèle TV Smarters :
-             Changer de serveur / Favoris / Historique côte à côte,
-             au lieu de 3 barres pleine largeur empilées. -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:orientation="horizontal">
-
-            <LinearLayout
-                android:id="@+id/tileChangeServer"
-                android:layout_width="0dp"
-                android:layout_height="44dp"
-                android:layout_weight="1"
-                android:layout_marginStart="8dp"
-                android:layout_marginEnd="4dp"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:background="@drawable/bg_pill_green"
-                android:clickable="true"
-                android:focusable="true">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="🔄"
-                    android:textSize="14sp"
-                    android:layout_marginEnd="5dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="SERVEUR"
-                    android:textColor="@color/solplay_white"
-                    android:textStyle="bold"
-                    android:textSize="11sp"
-                    android:maxLines="1"
-                    android:letterSpacing="0.02" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/tileFavorites"
-                android:layout_width="0dp"
-                android:layout_height="44dp"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:background="@drawable/bg_pill_green"
-                android:clickable="true"
-                android:focusable="true">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="⭐"
-                    android:textSize="14sp"
-                    android:layout_marginEnd="5dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="FAVORIS"
-                    android:textColor="@color/solplay_white"
-                    android:textStyle="bold"
-                    android:textSize="11sp"
-                    android:maxLines="1"
-                    android:letterSpacing="0.02" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/tileHistory"
-                android:layout_width="0dp"
-                android:layout_height="44dp"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="8dp"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:background="@drawable/bg_pill_green"
-                android:clickable="true"
-                android:focusable="true">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="🕐"
-                    android:textSize="14sp"
-                    android:layout_marginEnd="5dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="HISTORIQUE"
-                    android:textColor="@color/solplay_white"
-                    android:textStyle="bold"
-                    android:textSize="11sp"
-                    android:maxLines="1"
-                    android:letterSpacing="0.02" />
-            </LinearLayout>
-
-        </LinearLayout>
-
-        <!-- Tuile Reprendre (visible uniquement si une lecture récente existe) -->
-        <LinearLayout
-            android:id="@+id/tileResume"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
-            android:orientation="horizontal"
+            android:layout_weight="1"
+            android:layout_marginTop="10dp"
+            android:orientation="vertical"
             android:gravity="center"
-            android:background="@color/solplay_orange"
+            android:background="@drawable/bg_home_tile_live"
             android:clickable="true"
             android:focusable="true"
-            android:visibility="gone">
+            android:padding="18dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📺"
+                android:textSize="42sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="LIVE"
+                android:textColor="@color/solplay_white"
+                android:textStyle="bold"
+                android:textSize="20sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tileMovies"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="14dp"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="@drawable/bg_home_tile_movies"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="18dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="▶"
-                android:textSize="18sp"
                 android:textColor="@color/solplay_white"
-                android:layout_marginEnd="8dp" />
+                android:textSize="42sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="MOVIES"
+                android:textColor="@color/solplay_white"
+                android:textStyle="bold"
+                android:textSize="20sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tileSeries"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="14dp"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="@drawable/bg_home_tile_series"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="18dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🎬"
+                android:textSize="40sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="SERIES"
+                android:textColor="@color/solplay_white"
+                android:textStyle="bold"
+                android:textSize="20sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal"
+            android:weightSum="3">
+
+            <LinearLayout
+                android:id="@+id/tileChangeServer"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_pill_green"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⟳"
+                    android:textColor="@color/solplay_white"
+                    android:textSize="16sp"
+                    android:layout_marginEnd="6dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="UPDATE EPG"
+                    android:textColor="@color/solplay_white"
+                    android:textStyle="bold"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/tileFavorites"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:layout_marginStart="3dp"
+                android:layout_marginEnd="3dp"
+                android:background="@drawable/bg_pill_green"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ⓘ"
+                    android:textColor="@color/solplay_white"
+                    android:textSize="16sp"
+                    android:layout_marginEnd="6dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ACCOUNT"
+                    android:textColor="@color/solplay_white"
+                    android:textStyle="bold"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/tileHistory"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_pill_green"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="↺"
+                    android:textColor="@color/solplay_white"
+                    android:textSize="16sp"
+                    android:layout_marginEnd="6dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="CATCH UP"
+                    android:textColor="@color/solplay_white"
+                    android:textStyle="bold"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tileResume"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:background="@color/solplay_orange"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone">
 
             <TextView
                 android:id="@+id/tvResumeLabel"
@@ -339,41 +288,38 @@
                 android:text="Reprendre"
                 android:textColor="@color/solplay_white"
                 android:textStyle="bold"
-                android:textSize="14sp"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:letterSpacing="0.03" />
+                android:textSize="14sp" />
         </LinearLayout>
-
     </LinearLayout>
 
-    <!-- Ligne d'infos compte, en bas de l'écran -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
-        android:paddingTop="6dp"
-        android:paddingBottom="16dp">
+        android:paddingStart="22dp"
+        android:paddingEnd="22dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="14dp">
 
         <TextView
             android:id="@+id/tvExpiration"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text=""
-            android:textColor="@color/solplay_text_secondary"
-            android:textSize="12sp" />
+            android:textColor="@color/solplay_white"
+            android:textSize="13sp" />
 
         <TextView
             android:id="@+id/tvConnectedAs"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text=""
-            android:textColor="@color/solplay_text_secondary"
-            android:textSize="12sp" />
-
+            android:textColor="@color/solplay_white"
+            android:textSize="13sp" />
     </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="28dp"
+        android:background="@color/solplay_orange" />
 
 </LinearLayout>
