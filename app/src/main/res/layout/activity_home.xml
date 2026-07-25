@@ -136,7 +136,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="MOVIES"
+                android:text="FILMS"
                 android:textColor="@color/solplay_white"
                 android:textStyle="bold"
                 android:textSize="20sp" />
@@ -155,17 +155,24 @@
             android:focusable="true"
             android:padding="18dp">
 
+            <!-- 🎬 (emoji couleur) remplacé par un glyphe simple avec couleur
+                 explicite : sur certaines TV/box Android sans police emoji
+                 couleur installée, un emoji ne s'affiche pas du tout (case
+                 vide invisible), contrairement à un caractère Unicode de
+                 base qui utilise toujours android:textColor. -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="🎬"
-                android:textSize="40sp" />
+                android:text="▤"
+                android:textColor="@color/solplay_white"
+                android:textSize="40sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="SERIES"
+                android:text="SÉRIES"
                 android:textColor="@color/solplay_white"
                 android:textStyle="bold"
                 android:textSize="20sp" />

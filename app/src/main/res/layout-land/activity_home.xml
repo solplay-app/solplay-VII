@@ -161,7 +161,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
-                        android:text="MOVIES"
+                        android:text="FILMS"
                         android:textColor="@color/solplay_white"
                         android:textStyle="bold"
                         android:textSize="20sp" />
@@ -179,17 +179,21 @@
                     android:focusable="true"
                     android:padding="18dp">
 
+                    <!-- 🎬 (emoji couleur) remplacé : invisible sur les TV/box
+                         Android sans police emoji couleur installée. -->
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="🎬"
+                        android:text="▤"
+                        android:textColor="@color/solplay_white"
+                        android:textStyle="bold"
                         android:textSize="46sp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
-                        android:text="SERIES"
+                        android:text="SÉRIES"
                         android:textColor="@color/solplay_white"
                         android:textStyle="bold"
                         android:textSize="20sp" />
