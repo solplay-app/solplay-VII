@@ -1,16 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Version PAYSAGE de l'écran d'accueil. Contrairement au portrait, la
-    hauteur d'écran d'un téléphone en paysage est bien plus faible - avec
-    des tuiles à hauteur "calculée en % de l'écran" (comme en portrait),
-    l'espace devenait trop serré pour contenir icône + texte, qui
-    disparaissait (voir capture utilisateur). Ici :
-      - tuiles en hauteur NATURELLE (wrap_content) au lieu d'un pourcentage
-        de l'écran, donc elles ne se compriment jamais l'une l'autre ;
-      - icônes/texte plus petits qu'en portrait (moins de place verticale) ;
-      - toute la grille est dans un ScrollView : si malgré tout ça ne
-        tient pas sur un écran particulièrement bas, ça défile au lieu de
-        se déformer ou de faire disparaître du texte.
+    Version PAYSAGE de l'écran d'accueil. Tuiles en hauteur NATURELLE
+    (wrap_content, pas un pourcentage de l'écran) + ScrollView de secours,
+    pour ne jamais comprimer icône/texte au point de les faire disparaître
+    (voir capture utilisateur du bug précédent). Icônes vectorielles +
+    effet "pop" au focus, comme la version portrait.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -113,23 +107,26 @@
                     android:gravity="center"
                     android:padding="10dp"
                     android:background="@drawable/bg_home_tile"
+                    android:stateListAnimator="@animator/tile_focus_pop"
                     android:clickable="true"
                     android:focusable="true">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="📺"
-                        android:textSize="22sp" />
+                    <ImageView
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:src="@drawable/ic_tile_live"
+                        android:contentDescription="TV LIVE" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:text="Live TV"
+                        android:layout_marginStart="12dp"
+                        android:text="TV LIVE"
+                        android:textAllCaps="true"
                         android:textColor="@color/solplay_white"
                         android:textStyle="bold"
-                        android:textSize="14sp" />
+                        android:textSize="18sp"
+                        android:letterSpacing="0.08" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -142,14 +139,15 @@
                     android:gravity="center"
                     android:padding="10dp"
                     android:background="@drawable/bg_home_tile"
+                    android:stateListAnimator="@animator/tile_focus_pop"
                     android:clickable="true"
                     android:focusable="true">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="🎬"
-                        android:textSize="22sp" />
+                    <ImageView
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:src="@drawable/ic_tile_films"
+                        android:contentDescription="Films" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -178,15 +176,15 @@
                     android:gravity="center"
                     android:padding="10dp"
                     android:background="@drawable/bg_home_tile"
+                    android:stateListAnimator="@animator/tile_focus_pop"
                     android:clickable="true"
                     android:focusable="true">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="🎞"
-                        android:textColor="@color/solplay_white"
-                        android:textSize="20sp" />
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_tile_series"
+                        android:contentDescription="Séries" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -208,14 +206,15 @@
                     android:gravity="center"
                     android:padding="10dp"
                     android:background="@drawable/bg_home_tile"
+                    android:stateListAnimator="@animator/tile_focus_pop"
                     android:clickable="true"
                     android:focusable="true">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="👤"
-                        android:textSize="22sp" />
+                    <ImageView
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:src="@drawable/ic_tile_account"
+                        android:contentDescription="Compte" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -244,14 +243,15 @@
                     android:gravity="center"
                     android:padding="10dp"
                     android:background="@drawable/bg_home_tile"
+                    android:stateListAnimator="@animator/tile_focus_pop"
                     android:clickable="true"
                     android:focusable="true">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="🔄"
-                        android:textSize="22sp" />
+                    <ImageView
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:src="@drawable/ic_tile_changeserver"
+                        android:contentDescription="Changer serveur" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -274,15 +274,15 @@
                     android:gravity="center"
                     android:padding="10dp"
                     android:background="@drawable/bg_home_tile"
+                    android:stateListAnimator="@animator/tile_focus_pop"
                     android:clickable="true"
                     android:focusable="true">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="↺"
-                        android:textColor="@color/solplay_white"
-                        android:textSize="22sp" />
+                    <ImageView
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:src="@drawable/ic_tile_replay"
+                        android:contentDescription="Replay" />
 
                     <TextView
                         android:layout_width="wrap_content"
