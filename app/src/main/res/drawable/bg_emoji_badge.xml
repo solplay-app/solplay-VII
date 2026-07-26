@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Halo circulaire semi-transparent posé derrière l'emoji de chaque tuile
+    d'accueil (Live/Films/Séries/etc.) : donne un rendu "badge/icône dessinée"
+    plus soigné qu'un simple emoji flottant sur le dégradé.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <solid android:color="#26FFFFFF" />
+</shape>
