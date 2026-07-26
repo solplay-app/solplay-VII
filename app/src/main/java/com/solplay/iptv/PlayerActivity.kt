@@ -43,6 +43,20 @@ class PlayerActivity : AppCompatActivity() {
     private var hasRetriedAfterRefresh = false
 
     /**
+     * CORRECTIF (bug "lecture s'arrête / Impossible de lire") : la plupart
+     * des erreurs ExoPlayer sur IPTV sont de simples micro-coupures réseau
+     * (wifi, box du fournisseur, etc.), pas un abonnement expiré ou un lien
+     * cassé. Avant de déclencher la lourde procédure (vérifier le compte
+     * puis recharger toute la playlist), on retente d'abord 2 fois, en
+     * douceur, la lecture du MÊME flux avec un court délai. Ça résout la
+     * grande majorité des coupures sans jamais afficher d'erreur à
+     * l'utilisateur. On ne passe à la procédure lourde que si ces
+     * tentatives rapides échouent aussi.
+     */
+    private var quickRetryCount = 0
+    private val maxQuickRetries = 2
+
+    /**
      * Préchargement des chaînes voisines (Live uniquement, pour un zapping
      * quasi instantané) : 2 instances ExoPlayer légères, préparées en
      * arrière-plan (playWhenReady = false, juste assez de buffer pour
@@ -143,6 +157,9 @@ class PlayerActivity : AppCompatActivity() {
                         Player.STATE_BUFFERING -> showBuffering(true)
                         Player.STATE_READY     -> {
                             showBuffering(false)
+                            // La lecture est repartie normalement : on remet le compteur
+                            // de tentatives rapides à zéro pour la prochaine coupure.
+                            quickRetryCount = 0
                             // Reprise VOD : seek au point mémorisé, consommé une seule fois.
                             val resumePos = resumePosForNextReady
                             if (resumePos > 0 && exo.currentPosition < 1000) {
@@ -552,6 +569,27 @@ class PlayerActivity : AppCompatActivity() {
     // Erreur de lecture
     // ──────────────────────────────────────────────────────────
     private fun handlePlaybackError() {
+        // Étape 1 : tentatives rapides et silencieuses sur le MÊME flux.
+        // Couvre le cas très fréquent d'une micro-coupure réseau qui se
+        // résout d'elle-même en 1-2 secondes - l'utilisateur ne voit rien.
+        val ch = currentChannel
+        if (quickRetryCount < maxQuickRetries && ch != null) {
+            quickRetryCount++
+            val delayMs = 1200L * quickRetryCount // 1.2s puis 2.4s
+            hideHandler.postDelayed({
+                if (!isFinishing) {
+                    player?.apply {
+                        setMediaItem(MediaItem.fromUri(ch.streamUrl))
+                        prepare()
+                        playWhenReady = true
+                    }
+                }
+            }, delayMs)
+            return
+        }
+
+        // Étape 2 : les tentatives rapides ont échoué -> il peut vraiment y
+        // avoir un problème de compte / de lien cassé, on vérifie côté serveur.
         val playlist = activePlaylist ?: run {
             Toast.makeText(this, "Erreur de lecture. Vérifiez votre connexion.", Toast.LENGTH_LONG).show()
             return
@@ -596,6 +634,7 @@ class PlayerActivity : AppCompatActivity() {
     // ──────────────────────────────────────────────────────────
     private fun playStream(url: String, name: String) {
         hasRetriedAfterRefresh = false
+        quickRetryCount = 0
         playStreamInternal(url, name)
     }
 
