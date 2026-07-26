@@ -29,6 +29,7 @@ class SolPlayApplication : Application() {
             override fun onActivityDestroyed(activity: Activity) {}
         })
         scheduleHourlyReminder()
+        LiveLicenseWatcher.start(this)
     }
 
     private fun scheduleHourlyReminder() {

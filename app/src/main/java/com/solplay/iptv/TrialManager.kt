@@ -142,6 +142,30 @@ object TrialManager {
 
     fun getLicensePlanLabel(context: Context): String? = prefs(context).getString(KEY_LICENSE_PLAN_LABEL, null)
 
+    /**
+     * true si (active, expiresAt) décrit une licence valide À MAINTENANT
+     * (heure serveur fiable) - même formule que dans [checkOnlineLicense],
+     * exposée ici pour [LiveLicenseWatcher] qui reçoit ces valeurs via un
+     * listener Firebase en continu plutôt que via un appel réseau ponctuel.
+     */
+    fun isLicenseSnapshotValid(context: Context, active: Boolean, expiresAt: Long): Boolean =
+        active && (expiresAt == 0L || trustedNow(context) < expiresAt)
+
+    /**
+     * Met à jour le cache local de licence à partir d'un snapshot Firebase
+     * reçu en direct (mêmes clés que [checkOnlineLicense]) - garde
+     * [isLicensed]/[getRemainingLicenseMillis] cohérents avec ce que
+     * [LiveLicenseWatcher] vient de recevoir, sans attendre le prochain
+     * appel réseau ponctuel.
+     */
+    fun applyLicenseSnapshot(context: Context, active: Boolean, expiresAt: Long, planLabel: String?) {
+        prefs(context).edit()
+            .putBoolean(KEY_LICENSED, active)
+            .putLong(KEY_LICENSE_EXPIRES_AT, expiresAt)
+            .putString(KEY_LICENSE_PLAN_LABEL, planLabel)
+            .apply()
+    }
+
     /** Millisecondes restantes sur la licence payante (0 si expirée ou sans licence). */
     fun getRemainingLicenseMillis(context: Context): Long {
         val expiresAt = getLicenseExpiresAt(context)

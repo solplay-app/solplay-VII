@@ -65,12 +65,14 @@ class HomeActivity : AppCompatActivity() {
         binding.tileMovies.setOnClickListener { openChannels(ContentType.MOVIE) }
         binding.tileSeries.setOnClickListener { openChannels(ContentType.SERIES) }
 
-        // Boutons secondaires visibles sur les maquettes.
+        // Boutons secondaires.
         binding.tileChangeServer.setOnClickListener { refreshEpgAndChannels() }
         binding.tileFavorites.setOnClickListener {
-            startActivity(Intent(this, AboutActivity::class.java))
+            startActivity(Intent(this, FavoritesActivity::class.java))
         }
-        binding.tileHistory.setOnClickListener { openCatchupShortcut() }
+        binding.tileHistory.setOnClickListener {
+            startActivity(Intent(this, HistoryActivity::class.java))
+        }
 
         // Icônes TV en haut à droite.
         binding.tileAccount.setOnClickListener {
@@ -112,31 +114,6 @@ class HomeActivity : AppCompatActivity() {
         val intent = Intent(this, ChannelsActivity::class.java)
         intent.putExtra(ChannelsActivity.EXTRA_INITIAL_TYPE, type.name)
         startActivity(intent)
-    }
-
-    /**
-     * Raccourci "Catch Up" : l'utilisateur ouvre directement la section Live,
-     * puis pourra lancer le replay depuis le lecteur si son fournisseur le propose.
-     */
-    private fun openCatchupShortcut() {
-        val activeId = PlaylistStore.getActiveId(this) ?: return
-        val playlist = PlaylistStore.getAll(this).firstOrNull { it.id == activeId } ?: return
-
-        if (playlist.extractXtreamCredentials() == null) {
-            Toast.makeText(
-                this,
-                "Catch Up disponible uniquement avec une playlist Xtream compatible.",
-                Toast.LENGTH_LONG
-            ).show()
-            return
-        }
-
-        Toast.makeText(
-            this,
-            "Choisissez une chaîne LIVE puis utilisez Catch Up dans le lecteur.",
-            Toast.LENGTH_LONG
-        ).show()
-        openChannels(ContentType.LIVE)
     }
 
     /** Actualisation manuelle des chaînes / catégories / EPG. */

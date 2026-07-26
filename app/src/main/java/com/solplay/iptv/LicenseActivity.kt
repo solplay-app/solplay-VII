@@ -20,6 +20,11 @@ import kotlinx.coroutines.launch
 
 class LicenseActivity : AppCompatActivity() {
 
+    companion object {
+        /** Message optionnel affiché à l'ouverture (ex: raison d'une éjection forcée par LiveLicenseWatcher). */
+        const val EXTRA_REASON = "extra_reason"
+    }
+
     private lateinit var binding: ActivityLicenseBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,6 +33,10 @@ class LicenseActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         DisclaimerDialog.showIfNeeded(this)
+
+        intent.getStringExtra(EXTRA_REASON)?.let { reason ->
+            Toast.makeText(this, reason, Toast.LENGTH_LONG).show()
+        }
 
         val deviceKey = DeviceKeyManager.getDeviceKey(this)
         binding.tvDeviceKey.text = getString(R.string.device_key_format, deviceKey)
