@@ -6,6 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <!-- QR Code scan (lecture caméra) — fusionné depuis founction netlify/index.html -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+  <!-- Icônes vectorielles (remplace les emoji par des icônes cohérentes et nettes) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css" />
 
   <style>
     :root {
@@ -241,12 +243,89 @@
     .key-filter-box { position: relative; }
     .key-filter-box input { margin-bottom: 6px; }
     #notifKeySelect { min-height: 42px; }
+
+    /* ── Icônes vectorielles (Tabler) : alignement propre dans boutons/titres/badges ── */
+    .ti {
+      display: inline-block;
+      vertical-align: -2px;
+      line-height: 1;
+      font-size: 15px;
+      margin-right: 5px;
+    }
+    h3 .ti, h4 .ti { font-size: 17px; margin-right: 7px; color: var(--orange); vertical-align: -3px; }
+    button .ti { margin-right: 6px; font-size: 15px; }
+    .small-btn .ti { margin-right: 4px; font-size: 13px; }
+    .btn-scan-inline .ti, .btn-close-qr .ti { margin-right: 0; font-size: 16px; }
+    header .ti { font-size: 18px; margin-right: 8px; color: var(--orange); vertical-align: -3px; }
+    .hint .ti { color: var(--orange); }
+    .badge .ti { margin-right: 4px; font-size: 11px; vertical-align: -1px; }
+    .rkey .ti { color: var(--orange); }
+
+    /* ── Animations : entrée en douceur + micro-interactions ──
+       Discret et fonctionnel, pas un feu d'artifice : les cartes glissent
+       légèrement au chargement, les boutons/lignes réagissent au survol,
+       le point de connexion "respire" pour montrer que c'est bien du
+       temps réel — l'ensemble doit donner une impression d'interface
+       soignée, pas gadget. */
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .card {
+      animation: fadeSlideIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    .card:hover {
+      border-color: var(--border-strong, #454B5C);
+      box-shadow: 0 10px 26px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+    #adminBox .card:nth-of-type(1) { animation-delay: 0.02s; }
+    #adminBox .card:nth-of-type(2) { animation-delay: 0.06s; }
+    #adminBox .card:nth-of-type(3) { animation-delay: 0.10s; }
+    #adminBox .card:nth-of-type(4) { animation-delay: 0.14s; }
+    #adminBox .card:nth-of-type(5) { animation-delay: 0.18s; }
+    #adminBox .card:nth-of-type(6) { animation-delay: 0.22s; }
+
+    button { transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease, opacity 0.15s ease; }
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(2px) scale(0.99); }
+
+    tbody tr { transition: background-color 0.15s ease; }
+    tbody tr:hover { background-color: rgba(255,122,0,0.06); }
+
+    .badge { transition: transform 0.15s ease; }
+    .badge.active {
+      animation: pulseGreen 2.4s ease-in-out infinite;
+    }
+    @keyframes pulseGreen {
+      0%, 100% { box-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 0 0 0 rgba(46,158,79,0.5); }
+      50%      { box-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 0 0 4px rgba(46,158,79,0); }
+    }
+
+    #connStatus .ti { transition: color 0.3s ease; }
+    #connStatus.ok .ti { animation: pulseDot 1.8s ease-in-out infinite; }
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.35; }
+    }
+
+    .dash-kpi { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .dash-kpi:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0,0,0,0.4); }
+
+    .renewal-row { transition: transform 0.15s ease, border-color 0.15s ease; }
+    .renewal-row:hover { transform: translateX(2px); border-color: var(--orange); }
+
+    input, select { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .card, button, .badge.active, #connStatus.ok .ti { animation: none !important; transition: none !important; }
+    }
   </style>
 </head>
 
 <body>
   <header>
-    🟠 SolPlay — Panneau Administrateur
+    <i class="ti ti-broadcast" aria-hidden="true"></i> SolPlay — Panneau Administrateur
     <span id="connStatus">Connexion...</span>
   </header>
 
@@ -265,7 +344,7 @@
 
       <!-- ===================== 0. TABLEAU DE BORD ===================== -->
       <div class="card" id="dashboardCard">
-        <h3>📊 Tableau de bord</h3>
+        <h3><i class="ti ti-chart-bar" aria-hidden="true"></i> Tableau de bord</h3>
         <div id="dashStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px;">
           <div class="dash-kpi" id="kpiTotal">— <span>Licences</span></div>
           <div class="dash-kpi" id="kpiActive">— <span>Actives</span></div>
@@ -273,13 +352,13 @@
           <div class="dash-kpi" id="kpiExpiring">— <span>Expirent ≤ 7j</span></div>
         </div>
 
-        <h4 style="margin-bottom:8px;">⏰ Demandes de renouvellement en attente</h4>
+        <h4 style="margin-bottom:8px;"><i class="ti ti-clock" aria-hidden="true"></i> Demandes de renouvellement en attente</h4>
         <div id="renewalRequestsList" style="font-size:13px;color:var(--text-dim);">Chargement…</div>
       </div>
 
       <!-- ===================== 1. GESTION DES CLÉS ===================== -->
       <div class="card">
-        <h3>🔑 Gestion des clés</h3>
+        <h3><i class="ti ti-key" aria-hidden="true"></i> Gestion des clés</h3>
         <p style="font-size:13px; color:#9A9FAE; margin-top:-6px;">
           Ajouter, modifier, activer/désactiver ou supprimer une clé appareil.
         </p>
@@ -290,11 +369,11 @@
         <div style="display:flex; gap:8px;">
           <div class="device-key-row" style="flex:1;">
             <input id="keyInput" placeholder="Ex: SP-A1B2C3D4" style="margin-bottom:0;" />
-            <button type="button" class="btn-scan-inline" onclick="openQrScanner()" title="Scanner le QR code du client">📷</button>
+            <button type="button" class="btn-scan-inline" onclick="openQrScanner()" title="Scanner le QR code du client"><i class="ti ti-camera" aria-hidden="true"></i></button>
           </div>
-          <button type="button" class="outline" style="white-space:nowrap;" onclick="generateKey()">🎲 Générer</button>
+          <button type="button" class="outline" style="white-space:nowrap;" onclick="generateKey()"><i class="ti ti-dice" aria-hidden="true"></i> Générer</button>
         </div>
-        <p class="hint">📱 Demandez au client d'ouvrir <b>À propos → QR de la clé</b> et de vous le montrer, puis cliquez 📷 pour scanner — ou utilisez 🎲 pour générer une nouvelle clé.</p>
+        <p class="hint"><i class="ti ti-device-mobile" aria-hidden="true"></i> Demandez au client d'ouvrir <b>À propos → QR de la clé</b> et de vous le montrer, puis cliquez <i class="ti ti-camera" aria-hidden="true"></i> pour scanner — ou utilisez <i class="ti ti-dice" aria-hidden="true"></i> pour générer une nouvelle clé.</p>
         <p class="hint" id="keyExistsHint"></p>
 
         <div class="inline-2">
@@ -310,9 +389,9 @@
 
         <label>Durée</label>
         <div class="duration-tabs">
-          <label><input type="radio" name="keyDur" value="test" checked onchange="toggleKeyDurationMode()" /> 🧪 Test (heures)</label>
-          <label><input type="radio" name="keyDur" value="normal" onchange="toggleKeyDurationMode()" /> 💳 Abonnement (mois)</label>
-          <label><input type="radio" name="keyDur" value="unlimited" onchange="toggleKeyDurationMode()" /> ♾️ Illimité</label>
+          <label><input type="radio" name="keyDur" value="test" checked onchange="toggleKeyDurationMode()" /> <i class="ti ti-flask" aria-hidden="true"></i> Test (heures)</label>
+          <label><input type="radio" name="keyDur" value="normal" onchange="toggleKeyDurationMode()" /> <i class="ti ti-credit-card" aria-hidden="true"></i> Abonnement (mois)</label>
+          <label><input type="radio" name="keyDur" value="unlimited" onchange="toggleKeyDurationMode()" /> <i class="ti ti-infinity" aria-hidden="true"></i> Illimité</label>
         </div>
 
         <div id="keyDurTest">
@@ -340,14 +419,14 @@
         <p class="hint" id="keyDurUnlHint" style="display:none;">Aucune date d'expiration ne sera appliquée.</p>
 
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="green" id="keySaveBtn" onclick="saveLicenseKey()">➕ Ajouter la clé</button>
+          <button class="green" id="keySaveBtn" onclick="saveLicenseKey()"><i class="ti ti-plus" aria-hidden="true"></i> Ajouter la clé</button>
           <button class="outline" onclick="clearLicenseForm()">Annuler / Nouveau</button>
         </div>
         <p id="keyMsg"></p>
 
         <div class="section-title" style="margin-top:20px;">
           <h4 style="margin:0;">Tableau récapitulatif des clés</h4>
-          <button class="outline small-btn" onclick="loadLicenses()">🔄 Rafraîchir</button>
+          <button class="outline small-btn" onclick="loadLicenses()"><i class="ti ti-refresh" aria-hidden="true"></i> Rafraîchir</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -362,8 +441,8 @@
       </div>
 
       <!-- ===================== 2. GESTION DES ASSIGNATIONS ===================== -->
-      <div class="card">
-        <h3>📤 Gestion des assignations (clé ↔ code M3U/Xtream)</h3>
+      <div class="card" id="assignationCard">
+        <h3><i class="ti ti-send" aria-hidden="true"></i> Gestion des assignations (clé ↔ code M3U/Xtream)</h3>
         <p style="font-size:13px; color:#9A9FAE; margin-top:-6px;">
           Associer une clé appareil à un code M3U/Xtream existant, avec sa propre durée.
         </p>
@@ -371,16 +450,19 @@
         <input type="hidden" id="editingAssignmentId" value="" />
 
         <label>Clé appareil</label>
-        <select id="assignKeySelect"></select>
+        <div class="key-filter-box">
+          <input id="assignKeyFilter" placeholder="<i class="ti ti-search" aria-hidden="true"></i> Filtrer par clé ou nom du client..." oninput="filterAssignKeySelect()" />
+          <select id="assignKeySelect" size="6"></select>
+        </div>
 
         <label>Code M3U / Xtream</label>
         <select id="assignCodeSelect"></select>
 
         <label>Durée de l'assignation</label>
         <div class="duration-tabs">
-          <label><input type="radio" name="assignDur" value="test" checked onchange="toggleAssignDurationMode()" /> 🧪 Test (heures)</label>
-          <label><input type="radio" name="assignDur" value="normal" onchange="toggleAssignDurationMode()" /> 💳 Abonnement (mois)</label>
-          <label><input type="radio" name="assignDur" value="unlimited" onchange="toggleAssignDurationMode()" /> ♾️ Illimité</label>
+          <label><input type="radio" name="assignDur" value="test" checked onchange="toggleAssignDurationMode()" /> <i class="ti ti-flask" aria-hidden="true"></i> Test (heures)</label>
+          <label><input type="radio" name="assignDur" value="normal" onchange="toggleAssignDurationMode()" /> <i class="ti ti-credit-card" aria-hidden="true"></i> Abonnement (mois)</label>
+          <label><input type="radio" name="assignDur" value="unlimited" onchange="toggleAssignDurationMode()" /> <i class="ti ti-infinity" aria-hidden="true"></i> Illimité</label>
         </div>
 
         <div id="assignDurTest">
@@ -407,12 +489,12 @@
 
         <p class="hint" id="assignDurUnlHint" style="display:none;">Aucune date d'expiration ne sera appliquée.</p>
 
-        <button class="green" onclick="saveAssignment()">✅ Assigner</button>
+        <button class="green" onclick="saveAssignment()"><i class="ti ti-circle-check" aria-hidden="true"></i> Assigner</button>
         <p id="assignMsg"></p>
 
         <div class="section-title" style="margin-top:20px;">
           <h4 style="margin:0;">Tableau récapitulatif des assignations</h4>
-          <button class="outline small-btn" onclick="loadAssignments()">🔄 Rafraîchir</button>
+          <button class="outline small-btn" onclick="loadAssignments()"><i class="ti ti-refresh" aria-hidden="true"></i> Rafraîchir</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -458,12 +540,12 @@
           <input id="codeXtreamPassword" />
         </div>
 
-        <button class="green" onclick="saveCode()">💾 Enregistrer le code</button>
+        <button class="green" onclick="saveCode()"><i class="ti ti-device-floppy" aria-hidden="true"></i> Enregistrer le code</button>
         <button class="outline" onclick="clearCodeForm()">Nouveau code</button>
         <p id="codeMsg"></p>
 
         <h3 style="margin-top:18px;">Codes enregistrés</h3>
-        <button class="outline" onclick="loadCodes()">🔄 Rafraîchir la liste</button>
+        <button class="outline" onclick="loadCodes()"><i class="ti ti-refresh" aria-hidden="true"></i> Rafraîchir la liste</button>
         <div class="table-wrap">
           <table>
             <thead>
@@ -476,7 +558,7 @@
 
       <!-- ===================== 4. NOTIFICATIONS PUSH ===================== -->
       <div class="card">
-        <h3>📢 Notifications</h3>
+        <h3><i class="ti ti-bell" aria-hidden="true"></i> Notifications</h3>
         <p style="font-size:13px; color:#9A9FAE; margin-top:-6px;">
           Envoie un message qui s'affiche directement dans le téléphone/TV du client
           (ex: "Votre abonnement expire dans 3 jours"). Envoyé via une fonction Netlify —
@@ -485,14 +567,14 @@
 
         <label>Destinataire</label>
         <div class="duration-tabs">
-          <label><input type="radio" name="notifTarget" value="all" checked onchange="toggleNotifTarget()" /> 📣 Tous les clients</label>
-          <label><input type="radio" name="notifTarget" value="one" onchange="toggleNotifTarget()" /> 🎯 Un client précis</label>
+          <label><input type="radio" name="notifTarget" value="all" checked onchange="toggleNotifTarget()" /> <i class="ti ti-speakerphone" aria-hidden="true"></i> Tous les clients</label>
+          <label><input type="radio" name="notifTarget" value="one" onchange="toggleNotifTarget()" /> <i class="ti ti-target" aria-hidden="true"></i> Un client précis</label>
         </div>
 
         <div id="notifOneBlock" style="display:none;">
           <label>Clé appareil</label>
           <div class="key-filter-box">
-            <input id="notifKeyFilter" placeholder="🔍 Filtrer par clé ou nom du client..." oninput="filterNotifKeySelect()" />
+            <input id="notifKeyFilter" placeholder="<i class="ti ti-search" aria-hidden="true"></i> Filtrer par clé ou nom du client..." oninput="filterNotifKeySelect()" />
             <select id="notifKeySelect" size="6"></select>
           </div>
         </div>
@@ -503,12 +585,12 @@
         <label>Message</label>
         <input id="notifBody" placeholder="Ex: Votre abonnement expire dans 3 jours. Contactez-nous pour le renouveler." maxlength="200" />
 
-        <button class="green" onclick="sendNotification()">📤 Envoyer</button>
+        <button class="green" onclick="sendNotification()"><i class="ti ti-send" aria-hidden="true"></i> Envoyer</button>
         <p id="notifMsg"></p>
 
         <div class="section-title" style="margin-top:20px;">
           <h4 style="margin:0;">Historique des envois</h4>
-          <button class="outline small-btn" onclick="loadNotifications()">🔄 Rafraîchir</button>
+          <button class="outline small-btn" onclick="loadNotifications()"><i class="ti ti-refresh" aria-hidden="true"></i> Rafraîchir</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -530,7 +612,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
   <script>
-    // ⚠️ Mets tes infos Firebase ici (déjà dans ton fichier d'origine)
+    // <i class="ti ti-alert-triangle" aria-hidden="true"></i> Mets tes infos Firebase ici (déjà dans ton fichier d'origine)
     const firebaseConfig = {
       apiKey: "AIzaSyAQxSB3M7SkF65Q44u7N1jvW-eZ2i7zjyQ",
       authDomain: "solplay-2ec6c.firebaseapp.com",
@@ -549,10 +631,10 @@
     const connStatusEl = document.getElementById('connStatus');
     db.ref('.info/connected').on('value', (snap) => {
       if (snap.val() === true) {
-        connStatusEl.textContent = '🟢 Connecté';
+        connStatusEl.innerHTML = '<i class="ti ti-circle-filled" style="color:#6EE894;font-size:10px;vertical-align:1px;" aria-hidden="true"></i> Connecté';
         connStatusEl.className = 'ok';
       } else {
-        connStatusEl.textContent = '🔴 Hors-ligne';
+        connStatusEl.innerHTML = '<i class="ti ti-circle-filled" style="color:#FF9C8F;font-size:10px;vertical-align:1px;" aria-hidden="true"></i> Hors-ligne';
         connStatusEl.className = 'bad';
       }
     });
@@ -561,7 +643,7 @@
       console.error(err);
       const el = document.getElementById(elementId);
       const code = err && err.code ? ' (' + err.code + ')' : '';
-      el.innerHTML = '<span class="msg-err">❌ Erreur : ' + (err && err.message ? err.message : err) + code + '</span>';
+      el.innerHTML = '<span class="msg-err"><i class="ti ti-circle-x" aria-hidden="true"></i> Erreur : ' + (err && err.message ? err.message : err) + code + '</span>';
       if (err && (err.code === 'PERMISSION_DENIED' || (err.message || '').includes('permission_denied'))) {
         alert("Échec : accès refusé (PERMISSION_DENIED). Vérifie Firebase > Realtime Database > Rules.");
       }
@@ -655,6 +737,7 @@
     // ========================================================
     let licensesCache = {};
     let notifKeysCache = []; // { key, label } — utilisé par filterNotifKeySelect() pour filtrer sans re-requêter Firebase
+    let assignKeysCache = []; // { key, label } — même principe pour filterAssignKeySelect(), section Assignations
 
     function toggleKeyDurationMode() {
       const mode = document.querySelector('input[name="keyDur"]:checked').value;
@@ -679,7 +762,7 @@
       document.getElementById('keyCustContact').value = '';
       document.querySelector('input[name="keyDur"][value="test"]').checked = true;
       toggleKeyDurationMode();
-      document.getElementById('keySaveBtn').textContent = '➕ Ajouter la clé';
+      document.getElementById('keySaveBtn').innerHTML = '<i class="ti ti-plus" aria-hidden="true"></i> Ajouter la clé';
       document.getElementById('keyMsg').innerHTML = '';
       document.getElementById('keyExistsHint').textContent = '';
     }
@@ -691,7 +774,7 @@
       document.getElementById('keyInput').disabled = true; // on ne change pas l'identifiant d'une clé existante
       document.getElementById('keyCustName').value = data.customerName || '';
       document.getElementById('keyCustContact').value = data.customerContact || '';
-      document.getElementById('keySaveBtn').textContent = '💾 Mettre à jour la clé';
+      document.getElementById('keySaveBtn').innerHTML = '<i class="ti ti-device-floppy" aria-hidden="true"></i> Mettre à jour la clé';
       document.getElementById('keyMsg').innerHTML = '';
       document.getElementById('keyExistsHint').textContent = '';
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -722,8 +805,8 @@
         db.ref('licenses/' + key).set(payload)
           .then(() => {
             document.getElementById('keyMsg').innerHTML = isEdit
-              ? '<span class="msg-ok">✅ Clé mise à jour.</span>'
-              : '<span class="msg-ok">✅ Clé ajoutée.</span>';
+              ? '<span class="msg-ok"><i class="ti ti-circle-check" aria-hidden="true"></i> Clé mise à jour.</span>'
+              : '<span class="msg-ok"><i class="ti ti-circle-check" aria-hidden="true"></i> Clé ajoutée.</span>';
             clearLicenseForm();
             loadLicenses();
           })
@@ -738,8 +821,8 @@
         // Création : on bloque les doublons de clés
         db.ref('licenses/' + key).once('value').then((snap) => {
           if (snap.exists()) {
-            document.getElementById('keyExistsHint').innerHTML = '<span class="msg-err">❌ Cette clé existe déjà. Choisis un autre identifiant.</span>';
-            document.getElementById('keyMsg').innerHTML = '<span class="msg-err">❌ Doublon détecté : la clé existe déjà.</span>';
+            document.getElementById('keyExistsHint').innerHTML = '<span class="msg-err"><i class="ti ti-circle-x" aria-hidden="true"></i> Cette clé existe déjà. Choisis un autre identifiant.</span>';
+            document.getElementById('keyMsg').innerHTML = '<span class="msg-err"><i class="ti ti-circle-x" aria-hidden="true"></i> Doublon détecté : la clé existe déjà.</span>';
             return;
           }
           finalize(null);
@@ -783,6 +866,7 @@
         select.innerHTML = '';
         if (notifSelect) notifSelect.innerHTML = '';
         notifKeysCache = [];
+        assignKeysCache = [];
         licensesCache = {};
 
         if (!snapshot.exists()) {
@@ -812,9 +896,10 @@
             <td>${escapeHtml(remainingText)}</td>
             <td>${badgeFor(!!data.active, expired)}</td>
             <td>
-              <button class="outline small-btn" onclick="editLicenseKey('${key}')">✏️ Modifier</button>
+              <button class="outline small-btn" onclick="goAssignKey('${key}')"><i class="ti ti-send" aria-hidden="true"></i> Assigner</button>
+              <button class="outline small-btn" onclick="editLicenseKey('${key}')"><i class="ti ti-pencil" aria-hidden="true"></i> Modifier</button>
               <button class="outline small-btn" onclick="toggleLicenseActive('${key}', ${!!data.active})">${data.active ? 'Désactiver' : 'Activer'}</button>
-              <button class="red small-btn" onclick="deleteLicenseKey('${key}')">🗑️ Supprimer</button>
+              <button class="red small-btn" onclick="deleteLicenseKey('${key}')"><i class="ti ti-trash" aria-hidden="true"></i> Supprimer</button>
             </td>
           `;
           tbody.appendChild(tr);
@@ -823,6 +908,7 @@
           opt.value = key;
           opt.textContent = key + (customer ? ` — ${customer}` : '');
           select.appendChild(opt);
+          assignKeysCache.push({ key, label: opt.textContent });
 
           if (notifSelect) {
             const notifOpt = document.createElement('option');
@@ -911,7 +997,7 @@
           if (d.code === code && d.status === 'active') duplicate = true;
         });
         if (duplicate) {
-          document.getElementById('assignMsg').innerHTML = '<span class="msg-err">❌ Cette clé est déjà assignée activement à ce code.</span>';
+          document.getElementById('assignMsg').innerHTML = '<span class="msg-err"><i class="ti ti-circle-x" aria-hidden="true"></i> Cette clé est déjà assignée activement à ce code.</span>';
           return;
         }
 
@@ -936,7 +1022,7 @@
               .set(buildDevicePlaylistPayload(codeData, true, expiresAt));
           })
           .then(() => {
-            document.getElementById('assignMsg').innerHTML = '<span class="msg-ok">✅ Assignation créée.</span>';
+            document.getElementById('assignMsg').innerHTML = '<span class="msg-ok"><i class="ti ti-circle-check" aria-hidden="true"></i> Assignation créée.</span>';
             loadAssignments();
           })
           .catch((err) => showError('assignMsg', err));
@@ -1039,11 +1125,11 @@
             <td>${escapeHtml(remainingText)}</td>
             <td>${statusBadge}</td>
             <td>
-              <button class="outline small-btn" onclick="toggleAssignmentDetails('${id}')">👁️ Afficher</button>
+              <button class="outline small-btn" onclick="toggleAssignmentDetails('${id}')"><i class="ti ti-eye" aria-hidden="true"></i> Afficher</button>
               ${stopped
                 ? `<button class="green small-btn" onclick="reactivateAssignment('${id}')">▶️ Réactiver</button>`
                 : `<button class="outline small-btn" onclick="stopAssignment('${id}')">⏸️ Stopper</button>`}
-              <button class="red small-btn" onclick="deleteAssignment('${id}')">🗑️ Supprimer</button>
+              <button class="red small-btn" onclick="deleteAssignment('${id}')"><i class="ti ti-trash" aria-hidden="true"></i> Supprimer</button>
             </td>
           `;
           tbody.appendChild(tr);
@@ -1108,7 +1194,7 @@
 
       db.ref('playlist_codes/' + code).set(payload)
         .then(() => {
-          document.getElementById('codeMsg').innerHTML = '<span class="msg-ok">✅ Code enregistré.</span>';
+          document.getElementById('codeMsg').innerHTML = '<span class="msg-ok"><i class="ti ti-circle-check" aria-hidden="true"></i> Code enregistré.</span>';
           clearCodeForm();
           loadCodes();
         })
@@ -1141,7 +1227,7 @@
             <td>${data.active ? '<span class="badge active">Active</span>' : '<span class="badge inactive">Inactive</span>'}</td>
             <td>
               <button class="outline small-btn" onclick="toggleCodeActive('${code}', ${!!data.active})">${data.active ? 'Désactiver' : 'Activer'}</button>
-              <button class="red small-btn" onclick="deleteCode('${code}')">🗑️ Supprimer</button>
+              <button class="red small-btn" onclick="deleteCode('${code}')"><i class="ti ti-trash" aria-hidden="true"></i> Supprimer</button>
             </td>
           `;
           tbody.appendChild(tr);
@@ -1227,6 +1313,62 @@
       }
     }
 
+    /**
+     * Même principe que filterNotifKeySelect() mais pour la liste déroulante
+     * "Clé appareil" de la section Assignations : l'admin tape 2-3 lettres
+     * de la clé ou du nom du client et la liste se réduit instantanément,
+     * au lieu de faire défiler (ou pire, recopier à la main) toutes les clés.
+     */
+    function filterAssignKeySelect() {
+      const query = document.getElementById('assignKeyFilter').value.trim().toLowerCase();
+      const select = document.getElementById('assignKeySelect');
+      const previousValue = select.value;
+      select.innerHTML = '';
+
+      const matches = query
+        ? assignKeysCache.filter((item) => item.label.toLowerCase().includes(query))
+        : assignKeysCache;
+
+      if (matches.length === 0) {
+        select.innerHTML = '<option value="">-- Aucune clé ne correspond --</option>';
+        return;
+      }
+
+      matches.forEach((item) => {
+        const opt = document.createElement('option');
+        opt.value = item.key;
+        opt.textContent = item.label;
+        select.appendChild(opt);
+      });
+
+      if (matches.some((item) => item.key === previousValue)) {
+        select.value = previousValue;
+      }
+    }
+
+    /**
+     * Appelé depuis le bouton "<i class="ti ti-send" aria-hidden="true"></i> Assigner" du tableau récapitulatif des
+     * clés : présélectionne directement la clé cliquée dans la liste de la
+     * section Assignations puis amène l'admin dessus en douceur. Plus
+     * besoin de rechercher ou recopier quoi que ce soit — un seul clic
+     * suffit entre "je viens de créer/voir cette clé" et "je l'assigne".
+     */
+    function goAssignKey(key) {
+      const filterInput = document.getElementById('assignKeyFilter');
+      const select = document.getElementById('assignKeySelect');
+      if (filterInput) filterInput.value = '';
+      filterAssignKeySelect();
+      if (select) select.value = key;
+
+      const card = document.getElementById('assignationCard');
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      // Amène le focus sur le choix du code M3U/Xtream, l'étape suivante
+      // logique une fois la clé déjà sélectionnée pour l'admin.
+      const codeSelect = document.getElementById('assignCodeSelect');
+      if (codeSelect) setTimeout(() => codeSelect.focus(), 400);
+    }
+
     function sendNotification() {
       const targetMode = document.querySelector('input[name="notifTarget"]:checked').value;
       const deviceKey = document.getElementById('notifKeySelect').value;
@@ -1255,11 +1397,11 @@
         .then((result) => {
           if (result.ok) {
             document.getElementById('notifMsg').innerHTML =
-              '<span class="msg-ok">✅ Envoyée (' + result.successCount + ' appareil(s), ' + result.failureCount + ' échec(s)).</span>';
+              '<span class="msg-ok"><i class="ti ti-circle-check" aria-hidden="true"></i> Envoyée (' + result.successCount + ' appareil(s), ' + result.failureCount + ' échec(s)).</span>';
             document.getElementById('notifTitle').value = '';
             document.getElementById('notifBody').value = '';
           } else {
-            document.getElementById('notifMsg').innerHTML = '<span class="msg-err">❌ ' + escapeHtml(result.reason || result.error || 'Échec de l\'envoi.') + '</span>';
+            document.getElementById('notifMsg').innerHTML = '<span class="msg-err"><i class="ti ti-circle-x" aria-hidden="true"></i> ' + escapeHtml(result.reason || result.error || 'Échec de l\'envoi.') + '</span>';
           }
           loadNotifications();
         })
@@ -1287,8 +1429,8 @@
 
         rows.forEach((data) => {
           const targetLabel = data.target === 'all'
-            ? '📣 Tous'
-            : '🎯 ' + (data.target || '—');
+            ? '<i class="ti ti-speakerphone" aria-hidden="true"></i> Tous'
+            : '<i class="ti ti-target" aria-hidden="true"></i> ' + (data.target || '—');
           const statusBadge = data.status === 'sent'
             ? '<span class="badge active">Envoyée</span>'
             : data.status === 'error'
@@ -1356,7 +1498,7 @@
       container.innerHTML = rows.map(r => `
         <div class="renewal-row" id="renew_${r.key}">
           <div>
-            <div class="rkey">🔑 ${escapeHtml(r.data.deviceKey || r.key)}</div>
+            <div class="rkey"><i class="ti ti-key" aria-hidden="true"></i> ${escapeHtml(r.data.deviceKey || r.key)}</div>
             <div class="rinfo">Client : <b>${escapeHtml(r.data.customerName || '—')}</b> · Demandé le ${r.date} · Plan souhaité : ${escapeHtml(r.data.requestedPlan || 'Non précisé')}</div>
           </div>
           <div style="display:flex;gap:4px;flex-shrink:0;">
@@ -1366,8 +1508,8 @@
               <option value="6">6 mois</option>
               <option value="12">12 mois</option>
             </select>
-            <button class="btn-renew" onclick="approveRenewal('${r.key}','${r.data.deviceKey || r.key}')">✅ Renouveler</button>
-            <button class="btn-dismiss" onclick="dismissRenewal('${r.key}')">✕</button>
+            <button class="btn-renew" onclick="approveRenewal('${r.key}','${r.data.deviceKey || r.key}')"><i class="ti ti-circle-check" aria-hidden="true"></i> Renouveler</button>
+            <button class="btn-dismiss" onclick="dismissRenewal('${r.key}')"><i class="ti ti-x" aria-hidden="true"></i></button>
           </div>
         </div>`).join('');
     }
@@ -1415,7 +1557,7 @@
         });
       }).then(() => {
         document.getElementById('renew_' + requestKey)?.remove();
-        alert('✅ Renouvellement effectué pour ' + deviceKey + ' (' + months + ' mois). Le client verra la mise à jour automatiquement.');
+        alert('<i class="ti ti-circle-check" aria-hidden="true"></i> Renouvellement effectué pour ' + deviceKey + ' (' + months + ' mois). Le client verra la mise à jour automatiquement.');
         loadDashboard();
         loadLicenses();
       }).catch((err) => showError('renewalRequestsList', err));
@@ -1431,12 +1573,12 @@
   <!-- ── MODAL QR SCANNER (fusionné depuis founction netlify/index.html) ── -->
   <div class="qr-modal-overlay" id="qrScannerModal">
     <div class="qr-modal">
-      <h3>📷 Scanner la clé appareil</h3>
+      <h3><i class="ti ti-camera" aria-hidden="true"></i> Scanner la clé appareil</h3>
       <p>Demandez au client d'afficher son QR code depuis l'app SolPlay<br>(À propos → QR de la clé), puis pointez la caméra dessus.</p>
       <video id="qrVideo" autoplay muted playsinline></video>
       <canvas id="qrCanvas"></canvas>
       <div class="qr-status" id="qrStatus">En attente de la caméra…</div>
-      <button class="btn-close-qr" onclick="closeQrScanner()">✕ Fermer</button>
+      <button class="btn-close-qr" onclick="closeQrScanner()"><i class="ti ti-x" aria-hidden="true"></i> Fermer</button>
     </div>
   </div>
 
@@ -1467,7 +1609,7 @@
           video.srcObject = stream;
           video.play();
           video.addEventListener('loadedmetadata', () => {
-            document.getElementById('qrStatus').textContent = '🔍 Scan en cours…';
+            document.getElementById('qrStatus').innerHTML = '<i class="ti ti-search" aria-hidden="true"></i> Scan en cours…';
             scanFrame();
           }, { once: true });
         })
@@ -1475,11 +1617,11 @@
           const status = document.getElementById('qrStatus');
           status.className = 'qr-status err';
           if (err.name === 'NotAllowedError') {
-            status.textContent = '❌ Accès caméra refusé. Autorisez la caméra dans votre navigateur.';
+            status.innerHTML = '<i class="ti ti-circle-x" aria-hidden="true"></i> Accès caméra refusé. Autorisez la caméra dans votre navigateur.';
           } else if (err.name === 'NotFoundError') {
-            status.textContent = '❌ Aucune caméra détectée sur cet appareil.';
+            status.innerHTML = '<i class="ti ti-circle-x" aria-hidden="true"></i> Aucune caméra détectée sur cet appareil.';
           } else {
-            status.textContent = '❌ Erreur caméra : ' + err.message;
+            status.innerHTML = '<i class="ti ti-circle-x" aria-hidden="true"></i> Erreur caméra : ' + err.message;
           }
         });
     }
@@ -1511,7 +1653,7 @@
         if (/^[A-Z0-9-]{6,20}$/.test(key)) {
           _qrFound = true;
           document.getElementById('keyInput').value = key;
-          document.getElementById('qrStatus').textContent = '✅ Clé lue : ' + key;
+          document.getElementById('qrStatus').innerHTML = '<i class="ti ti-circle-check" aria-hidden="true"></i> Clé lue : ' + key;
           if (navigator.vibrate) navigator.vibrate(100);
           setTimeout(() => closeQrScanner(), 1200);
           return;
