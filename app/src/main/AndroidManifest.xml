@@ -40,7 +40,6 @@
         <activity android:name=".AboutActivity" android:exported="false" />
         <activity android:name=".DetailActivity" android:exported="false" />
         <activity android:name=".HistoryActivity" android:exported="false" />
-        <activity android:name=".FavoritesActivity" android:exported="false" />
 
         <service
             android:name=".SolPlayFirebaseMessagingService"
