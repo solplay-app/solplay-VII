@@ -5,6 +5,11 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+# Nécessaire pour que l'étape de publication de release puisse écrire dans
+# le dépôt (créer/mettre à jour une release + y attacher un fichier).
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -30,8 +35,30 @@ jobs:
       - name: Compiler l'APK (debug)
         run: gradle assembleDebug
 
-      - name: Mettre l'APK à disposition en téléchargement
+      - name: Mettre l'APK à disposition en téléchargement (artifact de build, temporaire)
         uses: actions/upload-artifact@v4
         with:
           name: SolPlay-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      # --- Ajout : vraie publication en Release GitHub ---
+      # Nom de fichier FIXE (solplay.apk) à chaque run : c'est ce qui permet
+      # d'avoir une URL de téléchargement stable dans le temps, à utiliser
+      # dans Downloader (voir plus bas).
+      - name: Renommer l'APK avec un nom fixe
+        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/solplay.apk
+
+      # tag_name + make_latest fixes : chaque exécution recrée/actualise LA
+      # MÊME release "latest", qui devient donc toujours la plus récente.
+      # C'est ça qui permet d'utiliser une seule URL fixe indéfiniment :
+      #   https://github.com/<compte>/<depot>/releases/latest/download/solplay.apk
+      - name: Publier/actualiser la release "latest"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Dernière version (build automatique)"
+          make_latest: true
+          files: app/build/outputs/apk/debug/solplay.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
