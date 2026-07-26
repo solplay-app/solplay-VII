@@ -6,7 +6,13 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.Gravity
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.solplay.iptv.databinding.ActivityLicenseBinding
@@ -137,6 +143,11 @@ class LicenseActivity : AppCompatActivity() {
     /**
      * Ouvre une conversation WhatsApp avec le revendeur. Le numéro n'est
      * jamais affiché comme texte à l'écran : il n'existe que dans ce lien.
+     *
+     * Sur téléphone/tablette : ouverture directe de WhatsApp (comportement
+     * inchangé). Sur TV/Box : WhatsApp n'est généralement pas installé, et
+     * la télécommande ne permet de toute façon pas de taper un message -
+     * on affiche donc un QR code du même lien, à scanner avec un téléphone.
      */
     private fun openWhatsAppContact(deviceKey: String) {
         val phone = getString(R.string.whatsapp_phone_international)
@@ -144,11 +155,56 @@ class LicenseActivity : AppCompatActivity() {
             "Bonjour, je souhaite souscrire à un abonnement SolPlay Pro.\n\nMa clé appareil : $deviceKey"
         )
         val uri = Uri.parse("https://wa.me/$phone?text=$message")
+
+        if (DeviceUtils.isTvDevice(this)) {
+            showWhatsAppQrDialog(uri.toString())
+            return
+        }
+
         try {
             startActivity(Intent(Intent.ACTION_VIEW, uri))
         } catch (e: Exception) {
             Toast.makeText(this, "WhatsApp n'est pas installé sur cet appareil.", Toast.LENGTH_LONG).show()
         }
+    }
+
+    /**
+     * Affiche le lien WhatsApp du revendeur sous forme de QR code (construit
+     * en code plutôt que via un layout XML séparé, pour un dialogue aussi
+     * simple). L'utilisateur scanne avec l'appareil photo de son téléphone,
+     * qui ouvre directement la conversation WhatsApp pré-remplie.
+     */
+    private fun showWhatsAppQrDialog(content: String) {
+        val qrBitmap = QrCodeGenerator.generate(content, sizePx = 640)
+        if (qrBitmap == null) {
+            Toast.makeText(this, "Impossible de générer le QR code.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val padding = (24 * resources.displayMetrics.density).toInt()
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(padding, padding, padding, padding)
+        }
+        val title = TextView(this).apply {
+            text = "Scannez avec votre téléphone pour contacter le revendeur sur WhatsApp"
+            gravity = Gravity.CENTER
+            textSize = 16f
+            setPadding(0, 0, 0, padding)
+        }
+        val qrSizePx = (260 * resources.displayMetrics.density).toInt()
+        val imageView = ImageView(this).apply {
+            setImageBitmap(qrBitmap)
+            layoutParams = LinearLayout.LayoutParams(qrSizePx, qrSizePx)
+        }
+        container.addView(title)
+        container.addView(imageView)
+
+        AlertDialog.Builder(this)
+            .setView(container)
+            .setPositiveButton("Fermer", null)
+            .show()
     }
 
     private fun goToApp() {

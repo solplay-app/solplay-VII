@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.solplay.iptv.databinding.ActivityEpgGridBinding
@@ -89,10 +90,72 @@ class EpgGridActivity : AppCompatActivity() {
                 currentScrollX = x
                 if (binding.scrollHeader.scrollX != x) binding.scrollHeader.scrollTo(x, 0)
                 propagateScrollToRows(x)
-            }
+            },
+            onProgramClick = { channel, segment -> onProgramClicked(channel, segment) }
         )
         binding.recyclerEpgRows.layoutManager = LinearLayoutManager(this)
         binding.recyclerEpgRows.adapter = adapter
+    }
+
+    /**
+     * Un clic sur une case de programme : si c'est le programme EN COURS,
+     * lance directement la lecture de cette chaîne (comme dans l'app de
+     * référence). Si c'est un programme passé ou futur, affiche juste ses
+     * informations (impossible de "regarder" un programme qui n'est pas
+     * diffusé actuellement, sauf via le catch-up - disponible une fois dans
+     * le lecteur, bouton 📼).
+     */
+    private fun onProgramClicked(channel: Channel, segment: EpgGridUtils.Segment) {
+        val now = System.currentTimeMillis()
+        val isCurrentlyAiring = now in segment.startMillis until segment.endMillis
+        if (isCurrentlyAiring) {
+            if (ParentalControl.isAdultChannel(channel) && !ParentalControl.isUnlocked()) {
+                showParentalPinDialog { playChannelNow(channel) }
+                return
+            }
+            playChannelNow(channel)
+        } else {
+            val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+            val whenLabel = if (segment.startMillis < now) "Terminé" else "À venir"
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(segment.title)
+                .setMessage(
+                    "${sdf.format(Date(segment.startMillis))} – ${sdf.format(Date(segment.endMillis))}" +
+                        "\n$whenLabel sur ${channel.name}" +
+                        if (segment.startMillis < now) "\n\nAstuce : le replay (catch-up) de ce programme est peut-être disponible - ouvrez la chaîne puis appuyez sur 📼." else ""
+                )
+                .setPositiveButton("OK", null)
+                .show()
+        }
+    }
+
+    private fun playChannelNow(channel: Channel) {
+        ChannelRepository.setPlayingList(ChannelRepository.epgGridChannels)
+        val intent = android.content.Intent(this, PlayerActivity::class.java)
+        intent.putExtra(PlayerActivity.EXTRA_STREAM_URL, channel.streamUrl)
+        intent.putExtra(PlayerActivity.EXTRA_STREAM_NAME, channel.name)
+        startActivity(intent)
+    }
+
+    /** Demande le code parental avant [onGranted] (même logique que ChannelsActivity). */
+    private fun showParentalPinDialog(onGranted: () -> Unit) {
+        val input = android.widget.EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            hint = "Code parental"
+        }
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("🔒 Contenu réservé aux adultes")
+            .setView(input)
+            .setPositiveButton("Valider") { _, _ ->
+                if (ParentalControl.verifyPin(this, input.text.toString())) {
+                    ParentalControl.unlock()
+                    onGranted()
+                } else {
+                    Toast.makeText(this, "Code incorrect.", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Annuler", null)
+            .show()
     }
 
     /** Applique la position de défilement horizontale à toutes les lignes actuellement visibles/recyclées. */

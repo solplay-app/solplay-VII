@@ -20,13 +20,11 @@ import com.google.zxing.qrcode.QRCodeWriter
 object QrCodeGenerator {
 
     /**
-     * @param deviceKey  La clé appareil brute (16 caractères, ex: "A1B2C3D4E5F6G7H8").
-     * @param sizePx     Taille du Bitmap carré en pixels (par défaut 512).
-     * @return           Un Bitmap noir sur fond blanc, ou null en cas d'erreur.
+     * Génère un QR Code à partir de n'importe quel contenu texte (URL, etc.).
+     * Fonction générique dont [generateForDeviceKey] n'est qu'un cas particulier.
      */
-    fun generateForDeviceKey(deviceKey: String, sizePx: Int = 512): Bitmap? {
+    fun generate(content: String, sizePx: Int = 512): Bitmap? {
         return try {
-            val content = "SOLPLAY:$deviceKey"
             val hints = mapOf(
                 EncodeHintType.CHARACTER_SET to "UTF-8",
                 EncodeHintType.MARGIN to 1          // marge minimale (quiet zone)
@@ -45,4 +43,12 @@ object QrCodeGenerator {
             null
         }
     }
+
+    /**
+     * @param deviceKey  La clé appareil brute (16 caractères, ex: "A1B2C3D4E5F6G7H8").
+     * @param sizePx     Taille du Bitmap carré en pixels (par défaut 512).
+     * @return           Un Bitmap noir sur fond blanc, ou null en cas d'erreur.
+     */
+    fun generateForDeviceKey(deviceKey: String, sizePx: Int = 512): Bitmap? =
+        generate("SOLPLAY:$deviceKey", sizePx)
 }

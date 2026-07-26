@@ -25,7 +25,8 @@ class EpgRowAdapter(
     private val windowEnd: Long,
     private val pxPerMinute: Float,
     private val getScrollX: () -> Int,
-    private val onRowScrolled: (Int) -> Unit
+    private val onRowScrolled: (Int) -> Unit,
+    private val onProgramClick: (Channel, EpgGridUtils.Segment) -> Unit
 ) : RecyclerView.Adapter<EpgRowAdapter.RowViewHolder>() {
 
     // Un scope par adapter pour les récupérations EPG en tâche de fond,
@@ -62,13 +63,13 @@ class EpgRowAdapter(
         // Affiche un espace réservé le temps que la vraie grille arrive,
         // pour que la ligne ait tout de suite la bonne largeur totale
         // (et donc un défilement horizontal cohérent avec les autres lignes).
-        renderSegments(holder, listOf(EpgGridUtils.Segment("Chargement…", windowStart, windowEnd, isPlaceholder = true)))
+        renderSegments(holder, channel, listOf(EpgGridUtils.Segment("Chargement…", windowStart, windowEnd, isPlaceholder = true)))
         holder.scroll.scrollTo(getScrollX(), 0)
         holder.scroll.onScrollXChanged = { x -> onRowScrolled(x) }
 
         val streamId = XtreamApiClient.extractStreamId(channel.streamUrl)
         if (streamId <= 0) {
-            renderSegments(holder, listOf(EpgGridUtils.Segment(EpgGridUtils.NO_INFO_LABEL, windowStart, windowEnd, isPlaceholder = true)))
+            renderSegments(holder, channel, listOf(EpgGridUtils.Segment(EpgGridUtils.NO_INFO_LABEL, windowStart, windowEnd, isPlaceholder = true)))
             return
         }
 
@@ -79,13 +80,14 @@ class EpgRowAdapter(
             val segments = EpgGridUtils.buildSegments(slots, windowStart, windowEnd)
             renderSegments(
                 holder,
+                channel,
                 segments.ifEmpty { listOf(EpgGridUtils.Segment(EpgGridUtils.NO_INFO_LABEL, windowStart, windowEnd, isPlaceholder = true)) }
             )
             holder.scroll.scrollTo(getScrollX(), 0)
         }
     }
 
-    private fun renderSegments(holder: RowViewHolder, segments: List<EpgGridUtils.Segment>) {
+    private fun renderSegments(holder: RowViewHolder, channel: Channel, segments: List<EpgGridUtils.Segment>) {
         val context = holder.itemView.context
         val density = context.resources.displayMetrics.density
         val minWidthPx = (40 * density).toInt()
@@ -109,6 +111,16 @@ class EpgRowAdapter(
             } else {
                 cell.setBackgroundResource(R.drawable.bg_epg_cell)
                 cell.setTextColor(android.graphics.Color.parseColor("#1A1A1A"))
+                // Programme réel (pas un espace réservé "Chargement…"/"Pas
+                // d'info") : cliquable, pour regarder la chaîne (si c'est le
+                // programme en cours) ou voir les infos (si passé/futur).
+                cell.isClickable = true
+                cell.isFocusable = true
+                cell.foreground = android.util.TypedValue().let { tv ->
+                    context.theme.resolveAttribute(android.R.attr.selectableItemBackground, tv, true)
+                    context.getDrawable(tv.resourceId)
+                }
+                cell.setOnClickListener { onProgramClick(channel, segment) }
             }
             holder.timeline.addView(cell)
         }

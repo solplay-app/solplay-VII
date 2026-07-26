@@ -77,6 +77,14 @@ class SolPlayFirebaseMessagingService : FirebaseMessagingService() {
         // le rappel horaire) : plusieurs notifications admin doivent pouvoir
         // s'empiler, pas s'écraser l'une l'autre.
         manager.notify(notificationCounter++, notification)
+
+        // Sur TV/Box, la notification système ci-dessus n'est généralement pas
+        // visible (pas de tiroir de notifications, pas d'UI système dédiée sur
+        // beaucoup de box génériques) : on affiche donc en plus un bandeau
+        // directement à l'écran, par-dessus l'app en cours d'utilisation.
+        if (DeviceUtils.isTvDevice(this)) {
+            TvNotificationBanner.show(title, body)
+        }
     }
 
     private fun createChannelIfNeeded() {

@@ -42,9 +42,30 @@ class PlayerActivity : AppCompatActivity() {
     private var assignmentWatcherJob: Job? = null
     private var hasRetriedAfterRefresh = false
 
+    /**
+     * Préchargement des chaînes voisines (Live uniquement, pour un zapping
+     * quasi instantané) : 2 instances ExoPlayer légères, préparées en
+     * arrière-plan (playWhenReady = false, juste assez de buffer pour
+     * démarrer) pour la chaîne juste avant et juste après la chaîne en
+     * cours dans [sideChannels]. Quand l'utilisateur zappe vers l'une des
+     * deux, on substitue directement ce lecteur déjà prêt au lecteur
+     * principal (tryFastSwap) au lieu de repartir de zéro - élimine la
+     * poignée de main réseau + le temps de bufferisation initial, qui est
+     * l'essentiel du délai perçu au zapping sur IPTV.
+     *
+     * Compromis assumé : ça consomme un peu plus de bande passante/mémoire
+     * en continu (jusqu'à 3 flux ouverts simultanément) - limité
+     * volontairement aux seules chaînes Live (VOD/séries n'ont pas besoin
+     * d'un zapping instantané, et ce serait un gâchis de bande passante).
+     */
+    private val preloadPlayers = mutableMapOf<String, ExoPlayer>()
+
     /** Chaîne actuellement en lecture (pour favoris / catch-up / reprise). */
     private var currentChannel: Channel? = null
     private var currentIsFavorite = false
+
+    /** Position à laquelle reprendre (VOD) dès que le prochain flux sera prêt - consommée une seule fois. */
+    private var resumePosForNextReady = 0L
 
     /** Cycle des ratios d'image : FIT (défaut) → FILL → ZOOM 4:3 → retour FIT */
     private val aspectRatios = listOf("Ajuster", "Remplir", "4:3", "16:9 étiré")
@@ -73,32 +94,9 @@ class PlayerActivity : AppCompatActivity() {
 
         val startUrl  = intent.getStringExtra(EXTRA_STREAM_URL)  ?: return
         val startName = intent.getStringExtra(EXTRA_STREAM_NAME) ?: ""
-        val resumePos = intent.getLongExtra(EXTRA_RESUME_POS, 0L)
+        resumePosForNextReady = intent.getLongExtra(EXTRA_RESUME_POS, 0L)
 
-        player = ExoPlayer.Builder(this).build().also { exo ->
-            binding.playerView.player = exo
-            exo.addListener(object : Player.Listener {
-
-                override fun onPlaybackStateChanged(state: Int) {
-                    when (state) {
-                        Player.STATE_BUFFERING -> showBuffering(true)
-                        Player.STATE_READY     -> {
-                            showBuffering(false)
-                            // Reprise VOD : seek au point mémorisé
-                            if (resumePos > 0 && exo.currentPosition < 1000) {
-                                exo.seekTo(resumePos)
-                            }
-                        }
-                        else -> showBuffering(false)
-                    }
-                }
-
-                override fun onPlayerError(error: PlaybackException) {
-                    showBuffering(false)
-                    handlePlaybackError()
-                }
-            })
-        }
+        initPlayer()
 
         setupSidePanel()
         playStream(startUrl, startName)
@@ -129,6 +127,65 @@ class PlayerActivity : AppCompatActivity() {
 
         setupSideSearch()
         startAssignmentWatcher()
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // Création / recréation du lecteur
+    // ──────────────────────────────────────────────────────────
+    private fun initPlayer() {
+        if (player != null) return // déjà prêt (ex: tout premier onCreate)
+        player = ExoPlayer.Builder(this).build().also { exo ->
+            binding.playerView.player = exo
+            exo.addListener(object : Player.Listener {
+
+                override fun onPlaybackStateChanged(state: Int) {
+                    when (state) {
+                        Player.STATE_BUFFERING -> showBuffering(true)
+                        Player.STATE_READY     -> {
+                            showBuffering(false)
+                            // Reprise VOD : seek au point mémorisé, consommé une seule fois.
+                            val resumePos = resumePosForNextReady
+                            if (resumePos > 0 && exo.currentPosition < 1000) {
+                                exo.seekTo(resumePos)
+                            }
+                            resumePosForNextReady = 0L
+                        }
+                        else -> showBuffering(false)
+                    }
+                }
+
+                override fun onPlayerError(error: PlaybackException) {
+                    showBuffering(false)
+                    handlePlaybackError()
+                }
+            })
+        }
+    }
+
+    /**
+     * IMPORTANT (correctif) : le lecteur est entièrement libéré dans onStop()
+     * (voir plus bas) pour ne pas garder de ressources vidéo/réseau en
+     * arrière-plan. Mais sans ce onStart(), si l'Activity repasse par
+     * onStop() PUIS onStart() sans jamais être totalement recréée par
+     * Android (cas très courant : mise en veille de l'écran, notification,
+     * app qui repasse rapidement au premier plan...), `player` restait
+     * définitivement à `null` - toute tentative de lecture après ça ne
+     * faisait plus rien (appel silencieux sur un `player?.` nul), ce qui
+     * correspond exactement au symptôme "après un moment, impossible de
+     * lire quoi que ce soit". On recrée maintenant le lecteur ici et on
+     * relance automatiquement la chaîne en cours, à la position mémorisée.
+     */
+    override fun onStart() {
+        super.onStart()
+        if (player == null) {
+            val ch = currentChannel
+            initPlayer()
+            if (ch != null) {
+                val saved = ResumeStore.get(this)
+                resumePosForNextReady = if (saved?.streamUrl == ch.streamUrl) saved.positionMs else 0L
+                playStreamInternal(ch.streamUrl, ch.name)
+            }
+        }
     }
 
     // ──────────────────────────────────────────────────────────
@@ -296,7 +353,87 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    /** Passe à la chaîne précédente (-1) ou suivante (+1) dans la liste latérale. */
+    // ──────────────────────────────────────────────────────────
+    // Préchargement des chaînes voisines (zapping instantané)
+    // ──────────────────────────────────────────────────────────
+
+    /** URLs des chaînes juste avant/après [currentChannel] dans la liste, uniquement si Live. */
+    private fun neighborLiveUrls(): List<String> {
+        val url = currentChannel?.streamUrl ?: return emptyList()
+        val idx = sideChannels.indexOfFirst { it.streamUrl == url }
+        if (idx < 0) return emptyList()
+        val neighbors = listOfNotNull(sideChannels.getOrNull(idx - 1), sideChannels.getOrNull(idx + 1))
+        return neighbors.filter { it.contentType() == ContentType.LIVE }.map { it.streamUrl }
+    }
+
+    /** Prépare (sans jouer) les lecteurs des chaînes voisines, et libère ceux qui ne sont plus utiles. */
+    private fun schedulePreloadNeighbors() {
+        val wanted = neighborLiveUrls().toSet()
+
+        // Libère les préchargements devenus inutiles (l'utilisateur a zappé ailleurs).
+        val stale = preloadPlayers.keys - wanted
+        stale.forEach { url -> preloadPlayers.remove(url)?.release() }
+
+        // Prépare les nouveaux voisins pas encore en cache.
+        for (url in wanted) {
+            if (preloadPlayers.containsKey(url)) continue
+            val exo = ExoPlayer.Builder(this).build()
+            exo.setMediaItem(MediaItem.fromUri(url))
+            exo.playWhenReady = false
+            exo.prepare()
+            preloadPlayers[url] = exo
+        }
+    }
+
+    /**
+     * Si un lecteur préchargé existe pour [url] et est déjà prêt (assez
+     * bufferisé pour démarrer sans à-coup), le substitue directement en
+     * lecteur principal - retourne true. Sinon retourne false, et l'appelant
+     * doit repartir sur un chargement classique (playStream).
+     */
+    private fun tryFastSwap(url: String, name: String): Boolean {
+        val ready = preloadPlayers[url]?.takeIf { it.playbackState == Player.STATE_READY } ?: return false
+        preloadPlayers.remove(url)
+
+        // L'ancien lecteur principal devient inutile (sa chaîne n'est plus
+        // forcément un voisin de la nouvelle position) - on le libère
+        // simplement, plus simple/sûr que de tenter de le recycler.
+        player?.release()
+
+        hasRetriedAfterRefresh = false
+        player = ready
+        binding.playerView.player = ready
+        ready.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(state: Int) {
+                showBuffering(state == Player.STATE_BUFFERING)
+            }
+            override fun onPlayerError(error: PlaybackException) {
+                showBuffering(false)
+                handlePlaybackError()
+            }
+        })
+        ready.playWhenReady = true
+
+        currentChannel = Channel(name = name, logoUrl = null, groupTitle = null, streamUrl = url)
+        currentIsFavorite = FavoritesStore.isFavorite(this, url)
+        updateFavButton()
+        binding.btnCatchup.visibility =
+            if (currentChannel?.contentType() == ContentType.LIVE && activePlaylist?.extractXtreamCredentials() != null)
+                View.VISIBLE else View.GONE
+        binding.tvChannelTitle.text = name
+        showBuffering(false)
+        loadProgramInfo(url)
+        showControlsTemporarily()
+
+        schedulePreloadNeighbors()
+        return true
+    }
+
+    private fun releaseAllPreloads() {
+        preloadPlayers.values.forEach { it.release() }
+        preloadPlayers.clear()
+    }
+
     private fun navigateChannel(delta: Int) {
         val url = currentChannel?.streamUrl ?: return
         val idx = sideChannels.indexOfFirst { it.streamUrl == url }
@@ -304,7 +441,9 @@ class PlayerActivity : AppCompatActivity() {
         val next = (idx + delta).coerceIn(0, sideChannels.lastIndex)
         if (next == idx) return
         val ch = sideChannels[next]
-        playStream(ch.streamUrl, ch.name)
+        if (!tryFastSwap(ch.streamUrl, ch.name)) {
+            playStream(ch.streamUrl, ch.name)
+        }
         showControlsTemporarily()
     }
 
@@ -369,7 +508,9 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
         ) { channel ->
-            playStream(channel.streamUrl, channel.name)
+            if (!tryFastSwap(channel.streamUrl, channel.name)) {
+                playStream(channel.streamUrl, channel.name)
+            }
             binding.channelListPanel.visibility = View.GONE
             binding.etSideSearch.text?.clear()
         }
@@ -476,6 +617,12 @@ class PlayerActivity : AppCompatActivity() {
 
         binding.tvChannelTitle.text = name
         showBuffering(true)
+        // Si un préchargement existait déjà pour cette URL (ex: l'utilisateur
+        // a zappé plus vite que le fast-swap, ou un cas où tryFastSwap n'a
+        // pas été utilisé), il devient redondant avec le lecteur principal
+        // qu'on s'apprête à préparer ci-dessous - on le libère pour éviter
+        // deux lecteurs ouverts sur le même flux.
+        preloadPlayers.remove(url)?.release()
         player?.apply {
             setMediaItem(MediaItem.fromUri(url))
             prepare()
@@ -483,6 +630,7 @@ class PlayerActivity : AppCompatActivity() {
         }
         loadProgramInfo(url)
         showControlsTemporarily()
+        schedulePreloadNeighbors()
     }
 
     // ──────────────────────────────────────────────────────────
@@ -543,5 +691,6 @@ class PlayerActivity : AppCompatActivity() {
         hideHandler.removeCallbacks(hideControlsRunnable)
         player?.release()
         player = null
+        releaseAllPreloads()
     }
 }

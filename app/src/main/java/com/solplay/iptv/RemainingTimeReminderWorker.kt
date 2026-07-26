@@ -89,6 +89,12 @@ class RemainingTimeReminderWorker(
 
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.notify(NOTIFICATION_ID, notification)
+
+        // Même raison que pour les messages admin (SolPlayFirebaseMessagingService) :
+        // la notification système n'est généralement pas visible sur TV/Box.
+        if (DeviceUtils.isTvDevice(context)) {
+            TvNotificationBanner.show("SolPlay — Temps restant", message)
+        }
     }
 
     private fun createChannelIfNeeded(context: Context) {
