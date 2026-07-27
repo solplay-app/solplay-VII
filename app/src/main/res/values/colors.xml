@@ -23,4 +23,10 @@
     <color name="solplay_panel_header_overlay">#D9E56A00</color>
     <color name="solplay_search_bg_overlay">#33FFFFFF</color>
     <color name="solplay_white_60">#99FFFFFF</color>
+
+    <!-- Textes sur fond blanc (écran d'abonnement/paiement) - les couleurs
+         de texte existantes (solplay_text_primary_dark, etc.) sont pensées
+         pour du texte clair sur fond sombre, donc illisibles ici. -->
+    <color name="solplay_text_on_light_primary">#1A1A1A</color>
+    <color name="solplay_text_on_light_secondary">#6B6F76</color>
 </resources>

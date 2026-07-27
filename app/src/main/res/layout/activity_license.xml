@@ -91,6 +91,15 @@
                 android:textSize="16sp"
                 android:gravity="center" />
         </LinearLayout>
+
+        <Button
+            android:id="@+id/btnPayOnline"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:backgroundTint="@color/solplay_orange"
+            android:text="Payer en ligne"
+            android:textColor="@color/solplay_white" />
     </LinearLayout>
 
     <Button
