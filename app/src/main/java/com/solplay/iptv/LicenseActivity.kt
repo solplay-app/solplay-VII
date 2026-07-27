@@ -103,6 +103,10 @@ class LicenseActivity : AppCompatActivity() {
         binding.btnWhatsApp.setOnClickListener {
             openWhatsAppContact(deviceKey)
         }
+
+        binding.btnPayOnline.setOnClickListener {
+            startActivity(Intent(this, SubscriptionActivity::class.java))
+        }
     }
 
     /**
