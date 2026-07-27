@@ -41,13 +41,18 @@ class SubscriptionActivity : AppCompatActivity() {
     private lateinit var inputEmail: EditText
     private lateinit var inputPhone: EditText
     private lateinit var deviceKey: String
+    private lateinit var scrollView: ScrollView
+    private lateinit var step1Container: LinearLayout
+    private lateinit var step2Container: LinearLayout
+    private lateinit var continueButton: Button
     private val tvPrimaryActionButtons = mutableListOf<View>()
+    private var runningOnTv = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         deviceKey = DeviceKeyManager.getDeviceKey(this)
-        val runningOnTv = isRunningOnTv(this)
+        runningOnTv = isRunningOnTv(this)
         val density = resources.displayMetrics.density
         fun dp(v: Int) = (v * density).toInt()
 
@@ -74,6 +79,71 @@ class SubscriptionActivity : AppCompatActivity() {
         root.addView(title)
         root.addView(subtitle)
 
+        // ───────────────────────── Étape 1 : informations du client ─────────────────────────
+        step1Container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        val infoTitle = TextView(this).apply {
+            text = "Vos informations"
+            setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_primary))
+            textSize = 16f
+            setTypeface(typeface, Typeface.BOLD)
+            setPadding(0, 0, 0, dp(4))
+        }
+        step1Container.addView(infoTitle)
+
+        inputFirstName = buildInputField("Prénom", dp = ::dp)
+        inputLastName = buildInputField("Nom", dp = ::dp)
+        inputEmail = buildInputField("Email", dp = ::dp).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+        }
+        inputPhone = buildInputField("Téléphone du payeur (ex: +22990123456)", dp = ::dp).apply {
+            inputType = InputType.TYPE_CLASS_PHONE
+        }
+        step1Container.addView(inputFirstName)
+        step1Container.addView(inputLastName)
+        step1Container.addView(inputEmail)
+        step1Container.addView(inputPhone)
+
+        continueButton = Button(this).apply {
+            text = "Continuer"
+            isAllCaps = false
+            isFocusable = true
+            isFocusableInTouchMode = true
+            setPadding(dp(20), dp(14), dp(20), dp(14))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(20) }
+        }
+        applyActionButtonStyle(continueButton, focused = false, primary = true, dp = ::dp)
+        continueButton.setOnFocusChangeListener { _, hasFocus ->
+            applyActionButtonStyle(continueButton, hasFocus, primary = true, dp = ::dp)
+        }
+        continueButton.setOnClickListener { goToStep2() }
+        step1Container.addView(continueButton)
+
+        root.addView(step1Container)
+
+        // ───────────────────────── Étape 2 : choix du forfait ─────────────────────────
+        step2Container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+        }
+
+        val backLink = TextView(this).apply {
+            text = "‹ Modifier mes informations"
+            setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_orange))
+            textSize = 13f
+            setTypeface(typeface, Typeface.BOLD)
+            isFocusable = true
+            isFocusableInTouchMode = true
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            setOnClickListener { goToStep1() }
+        }
+        step2Container.addView(backLink)
+
         val autoBlock = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(12), dp(14), dp(12))
@@ -85,10 +155,10 @@ class SubscriptionActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(18) }
+            ).apply { topMargin = dp(14); bottomMargin = dp(18) }
         }
         autoBlock.addView(TextView(this).apply {
-            text = "💡 Astuce : payez avec le même numéro que celui écrit dans le champ \"Téléphone\" ci-dessous. Votre abonnement s'activera automatiquement, sans rien faire d'autre."
+            text = "💡 Astuce : payez avec le même numéro que celui écrit dans le champ \"Téléphone\". Votre abonnement s'activera automatiquement, sans rien faire d'autre."
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
             textSize = 12f
         })
@@ -105,46 +175,24 @@ class SubscriptionActivity : AppCompatActivity() {
             setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
             setPadding(0, dp(6), 0, dp(2))
         })
-        root.addView(autoBlock)
-
-        val infoTitle = TextView(this).apply {
-            text = "Vos informations"
-            setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_primary))
-            textSize = 16f
-            setTypeface(typeface, Typeface.BOLD)
-            setPadding(0, 0, 0, dp(4))
-        }
-        root.addView(infoTitle)
-
-        inputFirstName = buildInputField("Prénom", dp = ::dp)
-        inputLastName = buildInputField("Nom", dp = ::dp)
-        inputEmail = buildInputField("Email", dp = ::dp).apply {
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
-        }
-        inputPhone = buildInputField("Téléphone du payeur (ex: +22990123456)", dp = ::dp).apply {
-            inputType = InputType.TYPE_CLASS_PHONE
-        }
-        root.addView(inputFirstName)
-        root.addView(inputLastName)
-        root.addView(inputEmail)
-        root.addView(inputPhone)
+        step2Container.addView(autoBlock)
 
         val plansTitle = TextView(this).apply {
             text = "Forfaits disponibles"
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_primary))
             textSize = 16f
             setTypeface(typeface, Typeface.BOLD)
-            setPadding(0, dp(24), 0, dp(4))
+            setPadding(0, 0, 0, dp(4))
         }
-        root.addView(plansTitle)
+        step2Container.addView(plansTitle)
 
         val progress = ProgressBar(this).apply { visibility = View.GONE }
 
         for (plan in SubscriptionPlan.ALL) {
-            root.addView(buildPlanCard(plan, deviceKey, progress, runningOnTv, dp = ::dp))
+            step2Container.addView(buildPlanCard(plan, deviceKey, progress, runningOnTv, dp = ::dp))
         }
 
-        root.addView(progress.apply {
+        step2Container.addView(progress.apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -154,17 +202,53 @@ class SubscriptionActivity : AppCompatActivity() {
             }
         })
 
+        root.addView(step2Container)
+
         val scroll = ScrollView(this).apply {
             setBackgroundColor(Color.WHITE)
             isFillViewport = true
             addView(root)
         }
+        scrollView = scroll
         setContentView(scroll)
 
         if (runningOnTv) {
-            scroll.post {
+            scroll.post { inputFirstName.requestFocus() }
+        }
+    }
+
+    /**
+     * Valide les 4 champs de l'étape 1, puis bascule vers l'étape 2
+     * (choix du forfait) — au lieu d'un unique formulaire à rallonge.
+     */
+    private fun goToStep2() {
+        val firstName = inputFirstName.text.toString().trim()
+        val lastName = inputLastName.text.toString().trim()
+        val email = inputEmail.text.toString().trim()
+        val phone = inputPhone.text.toString().trim()
+
+        if (firstName.isEmpty() || lastName.isEmpty() || email.isEmpty() || phone.isEmpty()) {
+            Toast.makeText(this, "Merci de remplir vos informations avant de continuer.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        step1Container.visibility = View.GONE
+        step2Container.visibility = View.VISIBLE
+        scrollView.post { scrollView.scrollTo(0, 0) }
+
+        if (runningOnTv) {
+            step2Container.post {
                 tvPrimaryActionButtons.firstOrNull()?.requestFocus()
             }
+        }
+    }
+
+    private fun goToStep1() {
+        step2Container.visibility = View.GONE
+        step1Container.visibility = View.VISIBLE
+        scrollView.post { scrollView.scrollTo(0, 0) }
+        if (runningOnTv) {
+            step1Container.post { inputFirstName.requestFocus() }
         }
     }
 
