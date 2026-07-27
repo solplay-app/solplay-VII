@@ -356,6 +356,39 @@
         <div id="renewalRequestsList" style="font-size:13px;color:var(--text-dim);">Chargement…</div>
       </div>
 
+      <!-- ===================== PAIEMENTS (DJÈKO) =====================
+           Alimentée par jeko-webhook.js (founction netlify/netlify/functions),
+           qui écrit chaque transaction reçue dans payments/{id} sur Firebase. -->
+      <div class="card" id="paymentsCard">
+        <h3><i class="ti ti-credit-card" aria-hidden="true"></i> Paiements (Djèko)</h3>
+        <div id="paymentsStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:10px;">
+          <div class="dash-kpi" id="kpiPaidTotal">— <span>Solde encaissé</span></div>
+          <div class="dash-kpi" id="kpiPaidCount">— <span>Paiements réussis</span></div>
+          <div class="dash-kpi" id="kpiPaidPending">— <span>À assigner manuellement</span></div>
+        </div>
+        <p style="font-size:12px;color:var(--text-dim);margin:0 0 14px;">
+          "Solde encaissé" = somme des paiements réussis reçus par le webhook Djèko, avant frais/reversement -
+          ce n'est pas forcément le solde exact affiché sur ton compte Djèko, juste ce que SolPlay a enregistré.
+        </p>
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr style="text-align:left; color:var(--text-dim); border-bottom:1px solid var(--border);">
+                <th style="padding:6px 8px;">Date</th>
+                <th style="padding:6px 8px;">Client</th>
+                <th style="padding:6px 8px;">Téléphone</th>
+                <th style="padding:6px 8px;">Montant</th>
+                <th style="padding:6px 8px;">Méthode</th>
+                <th style="padding:6px 8px;">Statut</th>
+              </tr>
+            </thead>
+            <tbody id="paymentsTableBody">
+              <tr><td colspan="6" style="padding:10px 8px;color:var(--text-dim);">Chargement…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- ===================== 1. GESTION DES CLÉS ===================== -->
       <div class="card">
         <h3><i class="ti ti-key" aria-hidden="true"></i> Gestion des clés</h3>
@@ -658,6 +691,7 @@
         loadAssignments();
         loadNotifications();
         loadDashboard();
+        loadPayments();
       } else {
         document.getElementById('loginBox').style.display = 'block';
         document.getElementById('adminBox').style.display = 'none';
@@ -1477,6 +1511,79 @@
         document.getElementById('kpiExpiring').innerHTML= expiring+ '<span>Expirent ≤ 7j</span>';
       }).catch((err) => showError('kpiTotal', err));
       loadRenewalRequests();
+    }
+
+    // Libellés lisibles pour les méthodes de paiement Djèko (voir doc
+    // webhook fournie : wave, orange, mtn, moov, djamo, bank).
+    const PAYMENT_METHOD_LABELS = {
+      wave: 'Wave', orange: 'Orange Money', mtn: 'MTN MoMo',
+      moov: 'Moov Money', djamo: 'Djamo', bank: 'Carte / Banque',
+    };
+
+    function formatXof(amount) {
+      if (typeof amount !== 'number') return '—';
+      return amount.toLocaleString('fr-FR') + ' FCFA';
+    }
+
+    /**
+     * Tableau de bord des paiements Djèko. Lit payments/{id}, écrit par
+     * jeko-webhook.js à chaque webhook reçu (voir ce fichier pour le détail
+     * de ce qui est enregistré et pourquoi certains paiements finissent
+     * "à assigner manuellement" plutôt que crédités automatiquement).
+     */
+    function loadPayments() {
+      db.ref('payments').limitToLast(50).once('value').then((snap) => {
+        const rows = [];
+        snap.forEach((child) => rows.push({ id: child.key, ...child.val() }));
+        rows.sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
+
+        let totalPaid = 0, countPaid = 0, countPending = 0;
+        rows.forEach((p) => {
+          if (p.status === 'success' && p.transactionType === 'payment') {
+            totalPaid += (p.amount || 0);
+            countPaid++;
+          }
+          if (p.needsManualAssignment) countPending++;
+        });
+
+        document.getElementById('kpiPaidTotal').innerHTML = formatXof(totalPaid) + '<span>Solde encaissé</span>';
+        document.getElementById('kpiPaidCount').innerHTML = countPaid + '<span>Paiements réussis</span>';
+        document.getElementById('kpiPaidPending').innerHTML = countPending + '<span>À assigner manuellement</span>';
+
+        const body = document.getElementById('paymentsTableBody');
+        if (rows.length === 0) {
+          body.innerHTML = '<tr><td colspan="6" style="padding:10px 8px;color:var(--text-dim);">Aucun paiement reçu pour le moment.</td></tr>';
+          return;
+        }
+
+        body.innerHTML = rows.map((p) => {
+          const dateLabel = p.executedAt
+            ? new Date(p.executedAt).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+            : '—';
+          const methodLabel = PAYMENT_METHOD_LABELS[p.paymentMethod] || (p.paymentMethod || '—');
+
+          let statusBadge;
+          if (p.status === 'success' && p.processed) {
+            statusBadge = '<span class="badge active"><i class="ti ti-circle-check" aria-hidden="true"></i>Crédité</span>';
+          } else if (p.status === 'success' && p.needsManualAssignment) {
+            statusBadge = '<span class="badge inactive"><i class="ti ti-alert-triangle" aria-hidden="true"></i>À assigner</span>';
+          } else if (p.status === 'success') {
+            statusBadge = '<span class="badge active">Réussi</span>';
+          } else {
+            statusBadge = '<span class="badge expired">Échec</span>';
+          }
+
+          return `
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:6px 8px; white-space:nowrap;">${dateLabel}</td>
+              <td style="padding:6px 8px;">${p.counterpartLabel || '—'}</td>
+              <td style="padding:6px 8px; white-space:nowrap;">${p.counterpartIdentifier || '—'}</td>
+              <td style="padding:6px 8px; white-space:nowrap;">${formatXof(p.amount)}</td>
+              <td style="padding:6px 8px;">${methodLabel}</td>
+              <td style="padding:6px 8px;">${statusBadge}</td>
+            </tr>`;
+        }).join('');
+      }).catch((err) => showError('kpiPaidTotal', err));
     }
 
     // Garde pour ne brancher l'écouteur temps réel qu'une seule fois,
