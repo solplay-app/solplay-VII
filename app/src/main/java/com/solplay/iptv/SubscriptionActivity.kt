@@ -1,6 +1,9 @@
 package com.solplay.iptv
 
+import android.app.UiModeManager
+import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -10,11 +13,13 @@ import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 
@@ -168,6 +173,11 @@ class SubscriptionActivity : AppCompatActivity() {
                 setStroke(dp(1), Color.parseColor("#DDDDDD"))
             }
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_primary))
+            // Sans cette ligne, le hint hérite de android:editTextColor du thème
+            // global (#F0F0F0, quasi blanc - pensé pour le fond sombre du reste
+            // de l'app) : sur le fond clair de CET écran, "Prénom"/"Email"/etc.
+            // devient invisible tant que le champ est vide. C'était le bug.
+            setHintTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dp(8) }
@@ -227,7 +237,98 @@ class SubscriptionActivity : AppCompatActivity() {
 
         card.addView(textCol)
         card.addView(payButton)
+
+        // Sur TV : le paiement Wave/Orange Money/MTN Money passe par l'appli
+        // du fournisseur installée sur LE TÉLÉPHONE du client - impossible à
+        // déclencher depuis une TV, quelle que soit l'interface (pas d'appli
+        // Wave sur une TV). La carte bancaire, elle, fonctionne très bien
+        // dans la WebView même sur TV : le bouton "Payer" reste donc utile
+        // tel quel. On ajoute juste, en plus, un bouton QR pour rediriger le
+        // paiement mobile money vers le téléphone du client.
+        if (isRunningOnTv(this)) {
+            val qrButton = Button(this).apply {
+                text = "📱"
+                textSize = 18f
+                setTextColor(Color.parseColor("#FF7A00"))
+                background = GradientDrawable().apply {
+                    setColor(Color.WHITE)
+                    cornerRadius = dp(8).toFloat()
+                    setStroke(dp(1), Color.parseColor("#FF7A00"))
+                }
+                setPadding(dp(14), dp(10), dp(14), dp(10))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { marginStart = dp(8) }
+            }
+            qrButton.setOnClickListener { showPaymentQrDialog(plan, deviceKey, dp = dp) }
+            card.addView(qrButton)
+        }
         return card
+    }
+
+    /**
+     * Affiche le lien de paiement du forfait sous forme de QR code, pour que
+     * le client le scanne avec son téléphone et termine le paiement
+     * Wave/Orange Money/MTN Money là-bas (impossible à faire directement sur
+     * une TV). La carte bancaire reste possible sans ça, via le bouton
+     * "Payer" classique (WebView), même sur TV.
+     */
+    private fun showPaymentQrDialog(plan: SubscriptionPlan, deviceKey: String, dp: (Int) -> Int) {
+        val url = plan.djekoPaymentUrl
+        if (url.isNullOrBlank()) {
+            Toast.makeText(this, "Paiement indisponible pour le moment. Contactez le revendeur via WhatsApp.", Toast.LENGTH_LONG).show()
+            return
+        }
+        val qrBitmap = QrCodeGenerator.generate(url, sizePx = 512)
+        if (qrBitmap == null) {
+            Toast.makeText(this, "Impossible de générer le QR code.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(20), dp(12), dp(20), dp(4))
+        }
+        container.addView(ImageView(this).apply {
+            setImageBitmap(qrBitmap)
+            layoutParams = LinearLayout.LayoutParams(dp(220), dp(220))
+        })
+        container.addView(TextView(this).apply {
+            text = "Scannez avec l'appareil photo de votre téléphone pour payer avec Wave, Orange Money, MTN Money ou carte bancaire."
+            setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setPadding(0, dp(14), 0, dp(4))
+        })
+        container.addView(TextView(this).apply {
+            text = "Important : collez ce code dans la référence/note du paiement, sur votre téléphone :"
+            setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
+            textSize = 12f
+            gravity = Gravity.CENTER
+            setPadding(0, dp(10), 0, dp(2))
+        })
+        container.addView(TextView(this).apply {
+            text = deviceKey
+            setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_orange))
+            textSize = 16f
+            setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
+            gravity = Gravity.CENTER
+        })
+
+        AlertDialog.Builder(this)
+            .setTitle("${plan.durationLabel} — ${plan.priceLabel}")
+            .setView(container)
+            .setPositiveButton("Fermer", null)
+            .show()
+    }
+
+    companion object {
+        /** Vrai si l'app tourne sur un boîtier/téléviseur Android TV plutôt qu'un téléphone ou une tablette. */
+        private fun isRunningOnTv(context: Context): Boolean {
+            val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+            return uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
+        }
     }
 
     private fun startPayment(
