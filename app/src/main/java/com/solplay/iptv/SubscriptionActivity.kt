@@ -22,22 +22,17 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 /**
- * Écran d'abonnement / paiement direct - fond blanc (contraste volontaire
- * avec le reste de l'app, thème sombre), affiché uniquement côté app
- * utilisateur (jamais dans le panneau admin, projet séparé).
+ * Écran d'abonnement / paiement direct.
  *
- * Tarifs confirmés : 1 mois/3000, 3 mois/9000, 6 mois/18000, 12 mois/19000 FCFA
- * (voir SubscriptionPlan.kt).
- *
- * Ne débloque JAMAIS rien elle-même : elle ouvre juste le lien de paiement
- * Djèko (Jeko) du forfait choisi. Le déblocage réel de la licence vient
- * TOUJOURS du webhook Djèko côté serveur qui met à jour Firebase (voir
- * founction netlify/netlify/functions/jeko-webhook.js) - l'app le détecte
- * alors automatiquement via LiveLicenseWatcher, déjà en place. Un
- * utilisateur malveillant ne peut donc jamais se débloquer sans payer,
- * même en modifiant l'app.
+ * Le vrai déblocage se fait uniquement côté serveur après webhook Djèko.
+ * L'app, elle, prépare maintenant une "intention de paiement" dans Firebase
+ * avec le numéro saisi par le client : si Djèko renvoie ensuite ce même numéro
+ * dans le webhook, le serveur peut retrouver automatiquement la bonne clé
+ * appareil même sans note/référence manuelle.
  */
 class SubscriptionActivity : AppCompatActivity() {
 
@@ -46,11 +41,13 @@ class SubscriptionActivity : AppCompatActivity() {
     private lateinit var inputEmail: EditText
     private lateinit var inputPhone: EditText
     private lateinit var deviceKey: String
+    private val tvPrimaryActionButtons = mutableListOf<View>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         deviceKey = DeviceKeyManager.getDeviceKey(this)
+        val runningOnTv = isRunningOnTv(this)
         val density = resources.displayMetrics.density
         fun dp(v: Int) = (v * density).toInt()
 
@@ -77,13 +74,7 @@ class SubscriptionActivity : AppCompatActivity() {
         root.addView(title)
         root.addView(subtitle)
 
-        // IMPORTANT (voir DjekoPaymentClient.kt) : le lien de paiement Djèko
-        // est le même pour tous les clients d'un forfait donné (lien
-        // statique, pas d'API dynamique documentée). C'est cette clé,
-        // recopiée par le client dans la référence/note du paiement, qui
-        // permet au webhook de savoir quel appareil créditer. Sans elle,
-        // le paiement finit en attribution manuelle côté admin.
-        val keyBlock = LinearLayout(this).apply {
+        val autoBlock = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(12), dp(14), dp(12))
             background = GradientDrawable().apply {
@@ -92,26 +83,30 @@ class SubscriptionActivity : AppCompatActivity() {
                 setStroke(dp(1), Color.parseColor("#FFD9AD"))
             }
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { bottomMargin = dp(18) }
         }
-        keyBlock.addView(TextView(this).apply {
-            text = "Important : au moment de payer, collez ce code dans le champ \"Référence\" ou \"Note\" du paiement, pour un déblocage automatique."
+        autoBlock.addView(TextView(this).apply {
+            text = "Activation automatique : payez de préférence avec le même numéro que celui saisi dans le champ Téléphone. Le serveur tentera alors d'associer automatiquement le paiement à cet appareil, sans note manuelle."
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
             textSize = 12f
         })
-        keyBlock.addView(TextView(this).apply {
+        autoBlock.addView(TextView(this).apply {
+            text = "Clé appareil de secours"
+            setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
+            textSize = 12f
+            setPadding(0, dp(10), 0, 0)
+        })
+        autoBlock.addView(TextView(this).apply {
             text = deviceKey
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_orange))
             textSize = 18f
             setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
             setPadding(0, dp(6), 0, dp(2))
         })
-        root.addView(keyBlock)
+        root.addView(autoBlock)
 
-        // Coordonnées du client, collectées une seule fois et réutilisées
-        // pour le forfait choisi (utile pour le suivi manuel côté admin
-        // si le paiement n'a pas pu être rattaché automatiquement).
         val infoTitle = TextView(this).apply {
             text = "Vos informations"
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_primary))
@@ -126,7 +121,7 @@ class SubscriptionActivity : AppCompatActivity() {
         inputEmail = buildInputField("Email", dp = ::dp).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
         }
-        inputPhone = buildInputField("Téléphone (ex: +22990123456)", dp = ::dp).apply {
+        inputPhone = buildInputField("Téléphone du payeur (ex: +22990123456)", dp = ::dp).apply {
             inputType = InputType.TYPE_CLASS_PHONE
         }
         root.addView(inputFirstName)
@@ -146,23 +141,33 @@ class SubscriptionActivity : AppCompatActivity() {
         val progress = ProgressBar(this).apply { visibility = View.GONE }
 
         for (plan in SubscriptionPlan.ALL) {
-            root.addView(buildPlanCard(plan, deviceKey, progress, dp = ::dp))
+            root.addView(buildPlanCard(plan, deviceKey, progress, runningOnTv, dp = ::dp))
         }
 
         root.addView(progress.apply {
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(16) }
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                topMargin = dp(16)
+            }
         })
 
         val scroll = ScrollView(this).apply {
             setBackgroundColor(Color.WHITE)
+            isFillViewport = true
             addView(root)
         }
         setContentView(scroll)
+
+        if (runningOnTv) {
+            scroll.post {
+                tvPrimaryActionButtons.firstOrNull()?.requestFocus()
+            }
+        }
     }
 
-    /** Champ de saisie simple : le hint sert de label, pas besoin d'un TextView séparé. */
     private fun buildInputField(hint: String, dp: (Int) -> Int): EditText {
         return EditText(this).apply {
             this.hint = hint
@@ -173,13 +178,10 @@ class SubscriptionActivity : AppCompatActivity() {
                 setStroke(dp(1), Color.parseColor("#DDDDDD"))
             }
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_primary))
-            // Sans cette ligne, le hint hérite de android:editTextColor du thème
-            // global (#F0F0F0, quasi blanc - pensé pour le fond sombre du reste
-            // de l'app) : sur le fond clair de CET écran, "Prénom"/"Email"/etc.
-            // devient invisible tant que le champ est vide. C'était le bug.
             setHintTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dp(8) }
         }
     }
@@ -188,6 +190,7 @@ class SubscriptionActivity : AppCompatActivity() {
         plan: SubscriptionPlan,
         deviceKey: String,
         progress: ProgressBar,
+        runningOnTv: Boolean,
         dp: (Int) -> Int
     ): LinearLayout {
         val card = LinearLayout(this).apply {
@@ -195,14 +198,11 @@ class SubscriptionActivity : AppCompatActivity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), dp(16), dp(16), dp(16))
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dp(10) }
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#F5F5F5"))
-                cornerRadius = dp(12).toFloat()
-                setStroke(dp(1), Color.parseColor("#E0E0E0"))
-            }
         }
+        applyCardFocusStyle(card, focused = false, dp = dp)
 
         val textCol = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -224,55 +224,87 @@ class SubscriptionActivity : AppCompatActivity() {
 
         val payButton = Button(this).apply {
             text = "Payer"
-            setTextColor(Color.WHITE)
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#FF7A00"))
-                cornerRadius = dp(8).toFloat()
-            }
+            isAllCaps = false
+            isFocusable = true
+            isFocusableInTouchMode = true
             setPadding(dp(20), dp(10), dp(20), dp(10))
         }
+        applyActionButtonStyle(payButton, focused = false, primary = true, dp = dp)
         payButton.setOnClickListener {
             startPayment(plan, deviceKey, progress, payButton)
+        }
+        payButton.setOnFocusChangeListener { _, hasFocus ->
+            applyActionButtonStyle(payButton, hasFocus, primary = true, dp = dp)
+            card.post { applyCardFocusStyle(card, card.hasFocus(), dp) }
+        }
+
+        if (runningOnTv) {
+            tvPrimaryActionButtons += payButton
         }
 
         card.addView(textCol)
         card.addView(payButton)
 
-        // Sur TV : le paiement Wave/Orange Money/MTN Money passe par l'appli
-        // du fournisseur installée sur LE TÉLÉPHONE du client - impossible à
-        // déclencher depuis une TV, quelle que soit l'interface (pas d'appli
-        // Wave sur une TV). La carte bancaire, elle, fonctionne très bien
-        // dans la WebView même sur TV : le bouton "Payer" reste donc utile
-        // tel quel. On ajoute juste, en plus, un bouton QR pour rediriger le
-        // paiement mobile money vers le téléphone du client.
-        if (isRunningOnTv(this)) {
+        if (runningOnTv) {
             val qrButton = Button(this).apply {
                 text = "📱"
                 textSize = 18f
-                setTextColor(Color.parseColor("#FF7A00"))
-                background = GradientDrawable().apply {
-                    setColor(Color.WHITE)
-                    cornerRadius = dp(8).toFloat()
-                    setStroke(dp(1), Color.parseColor("#FF7A00"))
-                }
+                isAllCaps = false
+                isFocusable = true
+                isFocusableInTouchMode = true
                 setPadding(dp(14), dp(10), dp(14), dp(10))
                 layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply { marginStart = dp(8) }
             }
+            applyActionButtonStyle(qrButton, focused = false, primary = false, dp = dp)
             qrButton.setOnClickListener { showPaymentQrDialog(plan, deviceKey, dp = dp) }
+            qrButton.setOnFocusChangeListener { _, hasFocus ->
+                applyActionButtonStyle(qrButton, hasFocus, primary = false, dp = dp)
+                card.post { applyCardFocusStyle(card, card.hasFocus(), dp) }
+            }
             card.addView(qrButton)
         }
+
         return card
     }
 
-    /**
-     * Affiche le lien de paiement du forfait sous forme de QR code, pour que
-     * le client le scanne avec son téléphone et termine le paiement
-     * Wave/Orange Money/MTN Money là-bas (impossible à faire directement sur
-     * une TV). La carte bancaire reste possible sans ça, via le bouton
-     * "Payer" classique (WebView), même sur TV.
-     */
+    private fun applyCardFocusStyle(card: LinearLayout, focused: Boolean, dp: (Int) -> Int) {
+        card.background = GradientDrawable().apply {
+            setColor(if (focused) Color.parseColor("#FFF0E0") else Color.parseColor("#F5F5F5"))
+            cornerRadius = dp(12).toFloat()
+            setStroke(
+                if (focused) dp(2) else dp(1),
+                if (focused) Color.parseColor("#FF7A00") else Color.parseColor("#E0E0E0")
+            )
+        }
+        card.scaleX = if (focused) 1.015f else 1f
+        card.scaleY = if (focused) 1.015f else 1f
+        card.elevation = if (focused) dp(6).toFloat() else 0f
+    }
+
+    private fun applyActionButtonStyle(button: Button, focused: Boolean, primary: Boolean, dp: (Int) -> Int) {
+        if (primary) {
+            button.setTextColor(Color.WHITE)
+            button.background = GradientDrawable().apply {
+                setColor(Color.parseColor(if (focused) "#E56700" else "#FF7A00"))
+                cornerRadius = dp(8).toFloat()
+                if (focused) setStroke(dp(2), Color.WHITE)
+            }
+        } else {
+            button.setTextColor(if (focused) Color.WHITE else Color.parseColor("#FF7A00"))
+            button.background = GradientDrawable().apply {
+                setColor(Color.parseColor(if (focused) "#FF7A00" else "#FFFFFF"))
+                cornerRadius = dp(8).toFloat()
+                setStroke(dp(if (focused) 2 else 1), Color.parseColor("#FF7A00"))
+            }
+        }
+        button.scaleX = if (focused) 1.06f else 1f
+        button.scaleY = if (focused) 1.06f else 1f
+        button.elevation = if (focused) dp(4).toFloat() else 0f
+    }
+
     private fun showPaymentQrDialog(plan: SubscriptionPlan, deviceKey: String, dp: (Int) -> Int) {
         val url = plan.djekoPaymentUrl
         if (url.isNullOrBlank()) {
@@ -295,23 +327,23 @@ class SubscriptionActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(dp(220), dp(220))
         })
         container.addView(TextView(this).apply {
-            text = "Scannez avec l'appareil photo de votre téléphone pour payer avec Wave, Orange Money, MTN Money ou carte bancaire."
+            text = "Scannez avec l'appareil photo de votre téléphone pour payer avec Wave, Orange Money, MTN Money, Moov, Djamo ou carte bancaire."
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
             textSize = 13f
             gravity = Gravity.CENTER
             setPadding(0, dp(14), 0, dp(4))
         })
         container.addView(TextView(this).apply {
-            text = "Important : collez ce code dans la référence/note du paiement, sur votre téléphone :"
+            text = "Pour l'activation automatique, utilisez le même numéro mobile que celui saisi dans le champ Téléphone sur la TV."
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
             textSize = 12f
             gravity = Gravity.CENTER
             setPadding(0, dp(10), 0, dp(2))
         })
         container.addView(TextView(this).apply {
-            text = deviceKey
+            text = "Clé appareil de secours : $deviceKey"
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_orange))
-            textSize = 16f
+            textSize = 13f
             setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
             gravity = Gravity.CENTER
         })
@@ -321,14 +353,6 @@ class SubscriptionActivity : AppCompatActivity() {
             .setView(container)
             .setPositiveButton("Fermer", null)
             .show()
-    }
-
-    companion object {
-        /** Vrai si l'app tourne sur un boîtier/téléviseur Android TV plutôt qu'un téléphone ou une tablette. */
-        private fun isRunningOnTv(context: Context): Boolean {
-            val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
-            return uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
-        }
     }
 
     private fun startPayment(
@@ -347,32 +371,52 @@ class SubscriptionActivity : AppCompatActivity() {
             return
         }
 
-        // Pas d'appel réseau ici : DjekoPaymentClient renvoie directement le
-        // lien statique du forfait (voir DjekoPaymentClient.kt pour le
-        // pourquoi). On garde quand même button/progress pour un retour
-        // visuel cohérent et parce que ça deviendra un vrai appel réseau
-        // le jour où Djèko documente une API de création dynamique.
         button.isEnabled = false
         progress.visibility = View.VISIBLE
 
-        val result = DjekoPaymentClient.getPaymentUrl(plan, deviceKey)
+        lifecycleScope.launch {
+            val registration = PaymentIntentRegistrar.registerIntent(
+                context = this@SubscriptionActivity,
+                plan = plan,
+                firstName = firstName,
+                lastName = lastName,
+                email = email,
+                phone = phone
+            )
 
-        progress.visibility = View.GONE
-        button.isEnabled = true
-
-        if (result == null) {
-            Toast.makeText(
-                this,
-                "Paiement indisponible pour le moment. Contactez le revendeur via WhatsApp.",
-                Toast.LENGTH_LONG
-            ).show()
-            return
-        }
-
-        startActivity(
-            Intent(this, PaymentWebViewActivity::class.java).apply {
-                putExtra(PaymentWebViewActivity.EXTRA_PAYMENT_URL, result.paymentUrl)
+            if (!registration.success) {
+                progress.visibility = View.GONE
+                button.isEnabled = true
+                Toast.makeText(this@SubscriptionActivity, registration.message, Toast.LENGTH_LONG).show()
+                return@launch
             }
-        )
+
+            val result = DjekoPaymentClient.getPaymentUrl(plan, deviceKey)
+
+            progress.visibility = View.GONE
+            button.isEnabled = true
+
+            if (result == null) {
+                Toast.makeText(
+                    this@SubscriptionActivity,
+                    "Paiement indisponible pour le moment. Contactez le revendeur via WhatsApp.",
+                    Toast.LENGTH_LONG
+                ).show()
+                return@launch
+            }
+
+            startActivity(
+                Intent(this@SubscriptionActivity, PaymentWebViewActivity::class.java).apply {
+                    putExtra(PaymentWebViewActivity.EXTRA_PAYMENT_URL, result.paymentUrl)
+                }
+            )
+        }
+    }
+
+    companion object {
+        private fun isRunningOnTv(context: Context): Boolean {
+            val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+            return uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
+        }
     }
 }
