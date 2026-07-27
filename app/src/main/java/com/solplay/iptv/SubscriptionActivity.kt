@@ -65,7 +65,7 @@ class SubscriptionActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
         }
         val subtitle = TextView(this).apply {
-            text = "Paiement sécurisé - accès activé automatiquement après confirmation."
+            text = "Paiement sécurisé. Votre accès s'active tout seul, dès que le paiement est confirmé."
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
             textSize = 13f
             gravity = Gravity.CENTER
@@ -88,12 +88,12 @@ class SubscriptionActivity : AppCompatActivity() {
             ).apply { bottomMargin = dp(18) }
         }
         autoBlock.addView(TextView(this).apply {
-            text = "Activation automatique : payez de préférence avec le même numéro que celui saisi dans le champ Téléphone. Le serveur tentera alors d'associer automatiquement le paiement à cet appareil, sans note manuelle."
+            text = "💡 Astuce : payez avec le même numéro que celui écrit dans le champ \"Téléphone\" ci-dessous. Votre abonnement s'activera automatiquement, sans rien faire d'autre."
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
             textSize = 12f
         })
         autoBlock.addView(TextView(this).apply {
-            text = "Clé appareil de secours"
+            text = "Si jamais l'activation ne se fait pas automatiquement, envoyez ce code à votre revendeur :"
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
             textSize = 12f
             setPadding(0, dp(10), 0, 0)
@@ -334,14 +334,14 @@ class SubscriptionActivity : AppCompatActivity() {
             setPadding(0, dp(14), 0, dp(4))
         })
         container.addView(TextView(this).apply {
-            text = "Pour l'activation automatique, utilisez le même numéro mobile que celui saisi dans le champ Téléphone sur la TV."
+            text = "Pour que ça s'active tout seul, payez avec ce même numéro que celui écrit dans le champ \"Téléphone\" sur la TV."
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
             textSize = 12f
             gravity = Gravity.CENTER
             setPadding(0, dp(10), 0, dp(2))
         })
         container.addView(TextView(this).apply {
-            text = "Clé appareil de secours : $deviceKey"
+            text = "Si ça ne marche pas tout seul, envoyez ce code à votre revendeur : $deviceKey"
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_orange))
             textSize = 13f
             setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
