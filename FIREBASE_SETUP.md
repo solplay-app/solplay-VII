@@ -45,6 +45,13 @@ Google personnel.
         ".read": true,
         ".write": "auth != null"
       }
+    },
+    "renewal_requests": {
+      ".read": true,
+      "$requestId": {
+        ".write": "auth != null || !data.exists()",
+        ".validate": "newData.hasChildren(['deviceKey', 'requestedPlan', 'requestedAt', 'status'])"
+      }
     }
   }
 }
@@ -52,7 +59,16 @@ Google personnel.
 
 Ça veut dire : n'importe qui peut vérifier SA propre licence, playlist assignée
 ou code (lecture publique par clé/appareil), mais seul un administrateur
-connecté peut créer/modifier/supprimer quoi que ce soit (écriture).
+connecté peut créer/modifier/supprimer quoi que ce soit (écriture) — sauf pour
+`renewal_requests`, où un client non connecté peut CRÉER une nouvelle demande
+(c'est lui qui clique sur "Demander un renouvellement" depuis l'app, sans
+être authentifié), mais ne peut ni la modifier ni la supprimer une fois créée
+— seul l'admin connecté le peut, pour éviter qu'un client s'auto-approuve.
+
+⚠️ **Si "Demander un renouvellement" affiche "Permission denied" dans l'app** :
+c'est exactement ce cas — le nœud `renewal_requests` n'a pas encore cette
+règle dans ta base (ancienne configuration, avant son ajout). Recolle
+l'intégralité du bloc ci-dessus dans l'onglet "Règles" pour corriger.
 
 ⚠️ **Important — cause la plus fréquente du panneau admin qui "ne sauvegarde
 plus rien"** : les anciennes règles ne couvraient que le nœud `licenses`. Sans
