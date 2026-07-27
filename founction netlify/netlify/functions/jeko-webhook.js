@@ -1,39 +1,15 @@
 /**
- * Fonction serveur Netlify : reçoit les webhooks Djèko (Jeko) et met à
- * jour la licence Firebase du client concerné.
+ * Fonction serveur Netlify : reçoit les webhooks Djèko (Jeko) et met à jour
+ * la licence Firebase du client concerné.
  *
- * Remplace l'ancienne intégration Zayono, entièrement retirée.
+ * Deux stratégies d'attribution automatique sont désormais supportées :
+ * 1) Référence explicite contenant la clé appareil (ancien flux, conservé)
+ * 2) Correspondance par numéro de payeur via `payment_intents/` lorsque le
+ *    client a saisi son téléphone dans l'app avant de payer.
  *
- * ─────────────────────────────────────────────────────────────────────
- * IMPORTANT — ce qui est certain vs ce qui est une hypothèse :
- *
- * CERTAIN (documenté dans "Intégration des Webhooks" fourni par
- * l'utilisateur) :
- *   - événement unique "transaction.completed"
- *   - vérification de signature HMAC-SHA256 via l'en-tête "Jeko-Signature"
- *   - structure exacte du payload JSON (id, amount, status, paymentMethod,
- *     transactionType, transactionDetails.reference, etc.)
- *   - doit répondre HTTP 200 sous 5 secondes
- *
- * HYPOTHÈSE (la doc fournie couvre uniquement la RÉCEPTION des paiements,
- * pas la création d'un paiement dynamique par l'app - aucune API "créer un
- * paiement" n'a été documentée) :
- *   - Le client paie via un lien de paiement statique créé à l'avance dans
- *     le Cockpit Djèko pour chaque forfait (voir SubscriptionPlan.kt côté
- *     app), PAS via un appel API dynamique.
- *   - Comme ce lien est le même pour tous les clients d'un même forfait,
- *     le webhook seul ne sait pas QUEL appareil créditer. Pour résoudre
- *     ça : l'app affiche la clé appareil du client et lui demande de la
- *     coller dans le champ "Référence"/"Note" au moment de payer (si le
- *     paiement Djèko le permet). Ce webhook cherche alors ce motif
- *     "SP-XXXXXXXX" dans transactionDetails.reference PUIS description.
- *   - Si la clé n'est pas trouvée automatiquement (client qui a oublié de
- *     la renseigner, ou champ non disponible côté Djèko) : le paiement est
- *     simplement enregistré dans `pending_payments/{id}` sur Firebase,
- *     pour assignation manuelle par l'admin (le panneau admin a déjà un
- *     flux "Assigner" rapide - il suffira d'y ajouter un onglet "Paiements
- *     en attente" listant ces entrées, si tu veux que je le fasse ensuite).
- * ─────────────────────────────────────────────────────────────────────
+ * Si plusieurs appareils sont en concurrence pour le même numéro et le même
+ * montant, on N'AUTOMATISE PAS : le paiement reste en attente d'assignation
+ * manuelle, pour éviter de créditer le mauvais client.
  */
 
 const crypto = require('crypto');
@@ -46,9 +22,6 @@ if (!admin.apps.length) {
   });
 }
 
-// Montant exact (XOF) -> durée du forfait en jours. Doit rester synchronisé
-// avec SubscriptionPlan.kt côté app (1 mois/3000, 3 mois/9000, 6 mois/18000,
-// 12 mois/19000 FCFA).
 const PLAN_BY_AMOUNT = {
   3000: { days: 30, label: '1 mois' },
   9000: { days: 90, label: '3 mois' },
@@ -56,9 +29,11 @@ const PLAN_BY_AMOUNT = {
   19000: { days: 365, label: '12 mois' },
 };
 
-// Format généré côté panneau admin (LicenseEditActivity.generateKey()) :
-// "SP-" + 8 caractères parmi ABCDEFGHJKLMNPQRSTUVWXYZ23456789.
-const DEVICE_KEY_PATTERN = /SP-[A-HJ-NP-Z2-9]{8}/i;
+// Compatibilité :
+// - ancien format supposé "SP-XXXXXXXX"
+// - format réellement affiché aujourd'hui par l'app : 16 caractères hexadécimaux
+const LEGACY_DEVICE_KEY_PATTERN = /SP-[A-HJ-NP-Z2-9]{8}/i;
+const HEX_DEVICE_KEY_PATTERN = /\b[A-F0-9]{16}\b/i;
 
 function verifySignature(rawBody, signatureHeader, secret) {
   if (!signatureHeader || !secret) return false;
@@ -79,12 +54,103 @@ function extractDeviceKey(payload) {
     payload.transactionDetails && payload.transactionDetails.reference,
     payload.description,
   ];
+
   for (const text of haystacks) {
     if (typeof text !== 'string') continue;
-    const match = text.match(DEVICE_KEY_PATTERN);
-    if (match) return match[0].toUpperCase();
+
+    const legacy = text.match(LEGACY_DEVICE_KEY_PATTERN);
+    if (legacy) return legacy[0].toUpperCase();
+
+    const hex = text.match(HEX_DEVICE_KEY_PATTERN);
+    if (hex) return hex[0].toUpperCase();
   }
   return null;
+}
+
+function normalizePhone(raw) {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const digits = trimmed.replace(/\D+/g, '');
+  if (digits.length < 8) return null;
+  return trimmed.startsWith('+') ? `+${digits}` : digits;
+}
+
+function parseExecutedAt(executedAt) {
+  if (typeof executedAt !== 'string' || !executedAt.trim()) return Date.now();
+  const normalized = executedAt.includes('T')
+    ? executedAt
+    : executedAt.replace(' ', 'T') + 'Z';
+  const parsed = Date.parse(normalized);
+  return Number.isFinite(parsed) ? parsed : Date.now();
+}
+
+function normalizeTransactionType(value) {
+  return (value || '').toString().toLowerCase().replace(/[^a-z]/g, '');
+}
+
+async function findIntentMatch(db, amountValue, counterpartIdentifier, executedAt) {
+  const phoneNormalized = normalizePhone(counterpartIdentifier);
+  if (!phoneNormalized) {
+    return { phoneNormalized: null, match: null, ambiguous: false, reason: 'telephone_introuvable' };
+  }
+
+  const snap = await db.ref('payment_intents')
+    .orderByChild('phoneNormalized')
+    .equalTo(phoneNormalized)
+    .once('value');
+
+  if (!snap.exists()) {
+    return { phoneNormalized, match: null, ambiguous: false, reason: 'aucune_intention' };
+  }
+
+  const executedAtMs = parseExecutedAt(executedAt);
+  const candidates = [];
+
+  snap.forEach((child) => {
+    const data = child.val() || {};
+    if ((data.status || 'pending') !== 'pending') return;
+    if (Number(data.amount) !== Number(amountValue)) return;
+
+    const createdAtMs = typeof data.createdAtServer === 'number'
+      ? data.createdAtServer
+      : Date.parse(data.createdAt || '');
+
+    if (Number.isFinite(createdAtMs)) {
+      const delta = executedAtMs - createdAtMs;
+      // Tolérance : intention créée jusqu'à 24h avant le paiement.
+      if (delta < -10 * 60 * 1000 || delta > 24 * 60 * 60 * 1000) return;
+    }
+
+    const deviceKey = typeof data.deviceKey === 'string' ? data.deviceKey.trim().toUpperCase() : null;
+    if (!deviceKey) return;
+
+    candidates.push({
+      id: child.key,
+      ...data,
+      deviceKey,
+      createdAtMs: Number.isFinite(createdAtMs) ? createdAtMs : 0,
+    });
+  });
+
+  if (!candidates.length) {
+    return { phoneNormalized, match: null, ambiguous: false, reason: 'aucun_candidat_valide' };
+  }
+
+  candidates.sort((a, b) => b.createdAtMs - a.createdAtMs);
+  const uniqueDeviceKeys = [...new Set(candidates.map((c) => c.deviceKey))];
+
+  if (uniqueDeviceKeys.length > 1) {
+    return { phoneNormalized, match: null, ambiguous: true, reason: 'plusieurs_appareils', candidatesCount: candidates.length };
+  }
+
+  return {
+    phoneNormalized,
+    match: candidates[0],
+    ambiguous: false,
+    reason: 'ok',
+    candidatesCount: candidates.length,
+  };
 }
 
 exports.handler = async (event) => {
@@ -92,8 +158,6 @@ exports.handler = async (event) => {
     return { statusCode: 405, body: 'Method not allowed' };
   }
 
-  // Corps BRUT requis pour la vérification HMAC (surtout pas JSON.parse
-  // avant, la doc est explicite là-dessus : "raw body, pas le JSON analysé").
   const rawBody = event.isBase64Encoded
     ? Buffer.from(event.body || '', 'base64').toString('utf8')
     : (event.body || '');
@@ -132,8 +196,6 @@ exports.handler = async (event) => {
   const db = admin.database();
   const paymentRef = db.ref('payments').child(txnId);
 
-  // Idempotence : Djèko peut retenter l'envoi si la réponse précédente a
-  // été trop lente ou perdue. On ne crédite jamais deux fois.
   const existing = await paymentRef.once('value');
   if (existing.exists() && existing.child('processed').val() === true) {
     return { statusCode: 200, body: JSON.stringify({ ok: true, alreadyProcessed: true }) };
@@ -150,29 +212,44 @@ exports.handler = async (event) => {
     description: description || null,
     executedAt: executedAt || null,
     reference: transactionDetails ? transactionDetails.reference || null : null,
+    paymentRequestId: transactionDetails ? transactionDetails.id || null : null,
+    paymentLinkId: transactionDetails ? transactionDetails.paymentLinkId || null : null,
     receivedAt: new Date().toISOString(),
     processed: false,
   });
 
-  // Seuls les paiements entrants réussis débloquent une licence. Les
-  // transferts (transactionType "transfer") ne concernent pas les
-  // abonnements clients et ne sont jamais traités ici.
-  if (status !== 'success' || transactionType !== 'payment') {
+  const normalizedType = normalizeTransactionType(transactionType);
+  const isPaymentLike = normalizedType === 'payment' || normalizedType === 'paymentrequest';
+
+  if (status !== 'success' || !isPaymentLike) {
     return { statusCode: 200, body: JSON.stringify({ ok: true, ignored: true }) };
   }
 
   const amountValue = amount ? amount.amount : null;
   const plan = PLAN_BY_AMOUNT[amountValue];
-  const deviceKey = extractDeviceKey(payload);
+
+  let deviceKey = extractDeviceKey(payload);
+  let intentMatch = null;
+  let attributionMethod = deviceKey ? 'reference' : null;
+
+  if (!deviceKey && plan) {
+    intentMatch = await findIntentMatch(db, amountValue, counterpartIdentifier, executedAt);
+    if (intentMatch.match) {
+      deviceKey = intentMatch.match.deviceKey;
+      attributionMethod = 'phone_intent';
+    }
+  }
 
   if (!plan || !deviceKey) {
-    // Montant non reconnu et/ou clé appareil introuvable dans la
-    // référence/description : on laisse la trace en base pour une
-    // assignation manuelle côté admin, mais on répond quand même 200 -
-    // c'est un cas attendu, pas une erreur d'intégration.
     await paymentRef.update({
       needsManualAssignment: true,
-      unmatchedReason: !plan ? 'montant_inconnu' : 'cle_appareil_introuvable',
+      unmatchedReason: !plan
+        ? 'montant_inconnu'
+        : intentMatch?.ambiguous
+          ? 'plusieurs_intentions_meme_numero'
+          : intentMatch?.reason || 'cle_appareil_introuvable',
+      autoMatchPhone: intentMatch?.phoneNormalized || normalizePhone(counterpartIdentifier),
+      attributionMethod: attributionMethod,
     });
     return { statusCode: 200, body: JSON.stringify({ ok: true, needsManualAssignment: true }) };
   }
@@ -189,11 +266,37 @@ exports.handler = async (event) => {
     expiresAt: newExpiresAt,
     planLabel: plan.label,
     customerName: licenseSnap.child('customerName').val() || counterpartLabel || '',
+    customerPhone: licenseSnap.child('customerPhone').val() || normalizePhone(counterpartIdentifier) || '',
     lastPaymentMethod: paymentMethod || null,
     lastPaymentAt: executedAt || new Date().toISOString(),
   });
 
-  await paymentRef.update({ processed: true, creditedDeviceKey: deviceKey });
+  const paymentUpdate = {
+    processed: true,
+    creditedDeviceKey: deviceKey,
+    attributionMethod,
+    matchedIntentId: intentMatch?.match?.id || null,
+    autoMatchPhone: intentMatch?.phoneNormalized || normalizePhone(counterpartIdentifier),
+    needsManualAssignment: false,
+  };
+  await paymentRef.update(paymentUpdate);
 
-  return { statusCode: 200, body: JSON.stringify({ ok: true, deviceKey, newExpiresAt }) };
+  if (intentMatch?.match?.id) {
+    await db.ref('payment_intents').child(intentMatch.match.id).update({
+      status: 'matched',
+      matchedPaymentId: txnId,
+      matchedDeviceKey: deviceKey,
+      matchedAt: new Date().toISOString(),
+    });
+  }
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({
+      ok: true,
+      deviceKey,
+      newExpiresAt,
+      attributionMethod,
+    }),
+  };
 };
