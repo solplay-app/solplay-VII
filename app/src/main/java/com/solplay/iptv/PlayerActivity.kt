@@ -57,6 +57,28 @@ class PlayerActivity : AppCompatActivity() {
     private val maxQuickRetries = 2
 
     /**
+     * CORRECTIF (bug "coupure en pleine lecture, obligé de reprendre la
+     * télécommande" + "impossible de relire avant 10 minutes ou plus") :
+     * une fois les tentatives rapides ET le rafraîchissement de playlist
+     * épuisés (voir handlePlaybackError), l'app affichait un simple Toast
+     * puis restait figée sans rien retenter - l'utilisateur devait s'en
+     * apercevoir seul et relancer manuellement. Certains fournisseurs IPTV
+     * limitent les connexions simultanées par compte et mettent plusieurs
+     * minutes à libérer une connexion restée mal fermée (ex: app tuée
+     * brutalement) ; ça ne dépend pas de la connexion internet du client.
+     * On ne peut pas réduire ce délai côté app, mais on peut éviter d'exiger
+     * une action manuelle : nouvelle tentative automatique et silencieuse
+     * toutes les 30s, jusqu'à 12 minutes, avec un bouton "Réessayer
+     * maintenant" toujours visible pour ne pas attendre si l'utilisateur
+     * préfère agir tout de suite.
+     */
+    private val backgroundRetryHandler = Handler(Looper.getMainLooper())
+    private var backgroundRetryRunnable: Runnable? = null
+    private var backgroundRetryAttempt = 0
+    private val maxBackgroundRetryAttempts = 24 // 24 x 30s ≈ 12 minutes
+    private val backgroundRetryIntervalMs = 30_000L
+
+    /**
      * Préchargement des chaînes voisines (Live uniquement, pour un zapping
      * quasi instantané) : 2 instances ExoPlayer légères, préparées en
      * arrière-plan (playWhenReady = false, juste assez de buffer pour
@@ -138,6 +160,7 @@ class PlayerActivity : AppCompatActivity() {
 
         // ── Catch-up ──
         binding.btnCatchup.setOnClickListener { openCatchup() }
+        binding.btnRetryNow.setOnClickListener { retryCurrentChannelNow() }
 
         setupSideSearch()
         startAssignmentWatcher()
@@ -157,6 +180,8 @@ class PlayerActivity : AppCompatActivity() {
                         Player.STATE_BUFFERING -> showBuffering(true)
                         Player.STATE_READY     -> {
                             showBuffering(false)
+                            binding.errorOverlay.visibility = View.GONE
+                            cancelBackgroundRetry()
                             // La lecture est repartie normalement : on remet le compteur
                             // de tentatives rapides à zéro pour la prochaine coupure.
                             quickRetryCount = 0
@@ -619,14 +644,68 @@ class PlayerActivity : AppCompatActivity() {
                         "Playlist mise à jour, nouvelle tentative…", Toast.LENGTH_SHORT).show()
                     playStreamInternal(updated.streamUrl, updated.name)
                 } else {
-                    Toast.makeText(this@PlayerActivity,
-                        "Impossible de lire cette chaîne pour le moment.", Toast.LENGTH_LONG).show()
+                    showErrorOverlayAndScheduleBackgroundRetry()
                 }
             } else {
-                Toast.makeText(this@PlayerActivity,
-                    "Impossible de lire cette chaîne pour le moment.", Toast.LENGTH_LONG).show()
+                showErrorOverlayAndScheduleBackgroundRetry()
             }
         }
+    }
+
+    /**
+     * Affiche l'overlay d'erreur (visible, avec bouton "Réessayer maintenant")
+     * et programme des tentatives automatiques silencieuses en arrière-plan -
+     * voir le commentaire sur [backgroundRetryHandler] pour le contexte.
+     */
+    private fun showErrorOverlayAndScheduleBackgroundRetry() {
+        if (isFinishing) return
+        val alreadyShowing = binding.errorOverlay.visibility == View.VISIBLE
+        binding.errorOverlay.visibility = View.VISIBLE
+        if (!alreadyShowing) backgroundRetryAttempt = 0
+        scheduleNextBackgroundRetry()
+    }
+
+    private fun scheduleNextBackgroundRetry() {
+        cancelBackgroundRetry()
+        if (backgroundRetryAttempt >= maxBackgroundRetryAttempts) {
+            binding.tvErrorSubMessage.text = "Réessaie plus tard, ou contacte ton fournisseur si ça persiste."
+            return
+        }
+        backgroundRetryRunnable = Runnable {
+            backgroundRetryAttempt++
+            retryCurrentChannelSilently()
+        }
+        backgroundRetryHandler.postDelayed(backgroundRetryRunnable!!, backgroundRetryIntervalMs)
+    }
+
+    private fun cancelBackgroundRetry() {
+        backgroundRetryRunnable?.let { backgroundRetryHandler.removeCallbacks(it) }
+        backgroundRetryRunnable = null
+    }
+
+    /** Tentative automatique, silencieuse (pas de Toast) - se reprogramme elle-même en cas de nouvel échec. */
+    private fun retryCurrentChannelSilently() {
+        val ch = currentChannel ?: return
+        if (isFinishing) return
+        quickRetryCount = 0
+        hasRetriedAfterRefresh = false
+        playStreamInternal(ch.streamUrl, ch.name)
+        // Si ça échoue à nouveau, onPlayerError -> handlePlaybackError sera
+        // rappelé normalement et reprogrammera la suite via scheduleNextBackgroundRetry
+        // (appelé depuis showErrorOverlayAndScheduleBackgroundRetry ci-dessus).
+        // On avance juste le sous-texte pour que ce ne soit pas silencieux visuellement.
+        binding.tvErrorSubMessage.text = "Nouvelle tentative automatique en cours…"
+    }
+
+    /** Appui manuel sur "Réessayer maintenant" : identique, mais immédiat et sans attendre le prochain cycle. */
+    private fun retryCurrentChannelNow() {
+        cancelBackgroundRetry()
+        backgroundRetryAttempt = 0
+        val ch = currentChannel ?: return
+        quickRetryCount = 0
+        hasRetriedAfterRefresh = false
+        binding.tvErrorSubMessage.text = "Nouvelle tentative en cours…"
+        playStreamInternal(ch.streamUrl, ch.name)
     }
 
     // ──────────────────────────────────────────────────────────
@@ -635,6 +714,9 @@ class PlayerActivity : AppCompatActivity() {
     private fun playStream(url: String, name: String) {
         hasRetriedAfterRefresh = false
         quickRetryCount = 0
+        cancelBackgroundRetry()
+        backgroundRetryAttempt = 0
+        binding.errorOverlay.visibility = View.GONE
         playStreamInternal(url, name)
     }
 
@@ -728,6 +810,7 @@ class PlayerActivity : AppCompatActivity() {
         super.onStop()
         saveResumePosition()
         hideHandler.removeCallbacks(hideControlsRunnable)
+        cancelBackgroundRetry()
         player?.release()
         player = null
         releaseAllPreloads()
