@@ -13,6 +13,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -51,14 +52,15 @@ class SubscriptionActivity : AppCompatActivity() {
         val density = resources.displayMetrics.density
         fun dp(v: Int) = (v * density).toInt()
 
-        val root = LinearLayout(this).apply {
+        // --- Étape 1 : formulaire d'informations ---
+        val formStep = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.WHITE)
             setPadding(dp(20), dp(28), dp(20), dp(28))
         }
 
         val title = TextView(this).apply {
-            text = "Choisissez votre forfait"
+            text = "Vos informations"
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_primary))
             textSize = 22f
             setTypeface(typeface, Typeface.BOLD)
@@ -71,8 +73,8 @@ class SubscriptionActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             setPadding(0, dp(6), 0, dp(20))
         }
-        root.addView(title)
-        root.addView(subtitle)
+        formStep.addView(title)
+        formStep.addView(subtitle)
 
         val autoBlock = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -105,7 +107,7 @@ class SubscriptionActivity : AppCompatActivity() {
             setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
             setPadding(0, dp(6), 0, dp(2))
         })
-        root.addView(autoBlock)
+        formStep.addView(autoBlock)
 
         val infoTitle = TextView(this).apply {
             text = "Vos informations"
@@ -114,7 +116,7 @@ class SubscriptionActivity : AppCompatActivity() {
             setTypeface(typeface, Typeface.BOLD)
             setPadding(0, 0, 0, dp(4))
         }
-        root.addView(infoTitle)
+        formStep.addView(infoTitle)
 
         inputFirstName = buildInputField("Prénom", dp = ::dp)
         inputLastName = buildInputField("Nom", dp = ::dp)
@@ -124,27 +126,70 @@ class SubscriptionActivity : AppCompatActivity() {
         inputPhone = buildInputField("Téléphone du payeur (ex: +22990123456)", dp = ::dp).apply {
             inputType = InputType.TYPE_CLASS_PHONE
         }
-        root.addView(inputFirstName)
-        root.addView(inputLastName)
-        root.addView(inputEmail)
-        root.addView(inputPhone)
+        formStep.addView(inputFirstName)
+        formStep.addView(inputLastName)
+        formStep.addView(inputEmail)
+        formStep.addView(inputPhone)
+
+        val continueButton = Button(this).apply {
+            text = "Continuer"
+            setTextColor(Color.WHITE)
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#FF7A00"))
+                cornerRadius = dp(8).toFloat()
+            }
+            setPadding(dp(20), dp(14), dp(20), dp(14))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(24) }
+        }
+        formStep.addView(continueButton)
+
+        val formScroll = ScrollView(this).apply {
+            setBackgroundColor(Color.WHITE)
+            isFillViewport = true
+            addView(formStep)
+        }
+
+        // --- Étape 2 : grille de forfaits (construite mais pas affichée tout de suite) ---
+        val plansStep = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.WHITE)
+            setPadding(dp(20), dp(28), dp(20), dp(28))
+        }
+
+        val backRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val backButton = TextView(this).apply {
+            text = "←  Modifier mes informations"
+            setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_orange))
+            textSize = 14f
+            setTypeface(typeface, Typeface.BOLD)
+            isClickable = true
+            isFocusable = true
+            setPadding(0, dp(8), 0, dp(8))
+        }
+        backRow.addView(backButton)
+        plansStep.addView(backRow)
 
         val plansTitle = TextView(this).apply {
             text = "Forfaits disponibles"
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_primary))
-            textSize = 16f
+            textSize = 20f
             setTypeface(typeface, Typeface.BOLD)
-            setPadding(0, dp(24), 0, dp(4))
+            setPadding(0, dp(12), 0, dp(4))
         }
-        root.addView(plansTitle)
+        plansStep.addView(plansTitle)
 
         val progress = ProgressBar(this).apply { visibility = View.GONE }
 
         for (plan in SubscriptionPlan.ALL) {
-            root.addView(buildPlanCard(plan, deviceKey, progress, runningOnTv, dp = ::dp))
+            plansStep.addView(buildPlanCard(plan, deviceKey, progress, runningOnTv, dp = ::dp))
         }
 
-        root.addView(progress.apply {
+        plansStep.addView(progress.apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -154,17 +199,43 @@ class SubscriptionActivity : AppCompatActivity() {
             }
         })
 
-        val scroll = ScrollView(this).apply {
+        val plansScroll = ScrollView(this).apply {
             setBackgroundColor(Color.WHITE)
             isFillViewport = true
-            addView(root)
+            visibility = View.GONE
+            addView(plansStep)
         }
-        setContentView(scroll)
+
+        // Conteneur commun : une seule des deux étapes visible à la fois.
+        val container = FrameLayout(this).apply {
+            addView(formScroll)
+            addView(plansScroll)
+        }
+        setContentView(container)
+
+        continueButton.setOnClickListener {
+            val firstName = inputFirstName.text.toString().trim()
+            val lastName = inputLastName.text.toString().trim()
+            val email = inputEmail.text.toString().trim()
+            val phone = inputPhone.text.toString().trim()
+            if (firstName.isEmpty() || lastName.isEmpty() || email.isEmpty() || phone.isEmpty()) {
+                Toast.makeText(this, "Merci de remplir vos informations avant de continuer.", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            formScroll.visibility = View.GONE
+            plansScroll.visibility = View.VISIBLE
+            if (runningOnTv) {
+                plansScroll.post { tvPrimaryActionButtons.firstOrNull()?.requestFocus() }
+            }
+        }
+
+        backButton.setOnClickListener {
+            plansScroll.visibility = View.GONE
+            formScroll.visibility = View.VISIBLE
+        }
 
         if (runningOnTv) {
-            scroll.post {
-                tvPrimaryActionButtons.firstOrNull()?.requestFocus()
-            }
+            formScroll.post { inputFirstName.requestFocus() }
         }
     }
 

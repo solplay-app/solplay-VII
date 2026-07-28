@@ -91,15 +91,6 @@ class LicenseActivity : AppCompatActivity() {
             }
         }
 
-        binding.btnContactUs.setOnClickListener {
-            val intent = Intent(Intent.ACTION_SENDTO).apply {
-                data = Uri.parse("mailto:" + getString(R.string.contact_email))
-                putExtra(Intent.EXTRA_SUBJECT, "Achat SolPlay Pro - Clé appareil : $deviceKey")
-                putExtra(Intent.EXTRA_TEXT, "Bonjour, je souhaite activer la version Pro de SolPlay.\n\nMa clé appareil : $deviceKey")
-            }
-            startActivity(Intent.createChooser(intent, "Contacter SolPlay"))
-        }
-
         binding.btnWhatsApp.setOnClickListener {
             openWhatsAppContact(deviceKey)
         }
