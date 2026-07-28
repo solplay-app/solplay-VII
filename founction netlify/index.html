@@ -422,10 +422,12 @@
 
         <label>Durée</label>
         <div class="duration-tabs">
+          <label id="keyDurKeepLabel" style="display:none;"><input type="radio" name="keyDur" value="keep" onchange="toggleKeyDurationMode()" /> <i class="ti ti-lock" aria-hidden="true"></i> Conserver la durée actuelle</label>
           <label><input type="radio" name="keyDur" value="test" checked onchange="toggleKeyDurationMode()" /> <i class="ti ti-flask" aria-hidden="true"></i> Test (heures)</label>
           <label><input type="radio" name="keyDur" value="normal" onchange="toggleKeyDurationMode()" /> <i class="ti ti-credit-card" aria-hidden="true"></i> Abonnement (mois)</label>
           <label><input type="radio" name="keyDur" value="unlimited" onchange="toggleKeyDurationMode()" /> <i class="ti ti-infinity" aria-hidden="true"></i> Illimité</label>
         </div>
+        <p id="keyDurKeepHint" class="hint" style="display:none;">La date d'expiration actuelle du client ne sera pas modifiée. Choisis une autre option ci-dessus seulement si tu veux vraiment changer sa durée.</p>
 
         <div id="keyDurTest">
           <label>Durée du test</label>
@@ -778,6 +780,7 @@
       document.getElementById('keyDurTest').style.display = (mode === 'test') ? 'block' : 'none';
       document.getElementById('keyDurNormal').style.display = (mode === 'normal') ? 'block' : 'none';
       document.getElementById('keyDurUnlHint').style.display = (mode === 'unlimited') ? 'block' : 'none';
+      document.getElementById('keyDurKeepHint').style.display = (mode === 'keep') ? 'block' : 'none';
     }
 
     function generateKey() {
@@ -794,6 +797,7 @@
       document.getElementById('keyInput').disabled = false;
       document.getElementById('keyCustName').value = '';
       document.getElementById('keyCustContact').value = '';
+      document.getElementById('keyDurKeepLabel').style.display = 'none';
       document.querySelector('input[name="keyDur"][value="test"]').checked = true;
       toggleKeyDurationMode();
       document.getElementById('keySaveBtn').innerHTML = '<i class="ti ti-plus" aria-hidden="true"></i> Ajouter la clé';
@@ -808,6 +812,13 @@
       document.getElementById('keyInput').disabled = true; // on ne change pas l'identifiant d'une clé existante
       document.getElementById('keyCustName').value = data.customerName || '';
       document.getElementById('keyCustContact').value = data.customerContact || '';
+      // Par défaut on ne touche PAS à la durée existante : avant ce correctif,
+      // modifier juste le nom/contact d'un client réinitialisait silencieusement
+      // sa date d'expiration (le formulaire renvoyait toujours la durée du mode
+      // actuellement sélectionné, même si l'admin ne voulait éditer que le nom).
+      document.getElementById('keyDurKeepLabel').style.display = 'inline-flex';
+      document.querySelector('input[name="keyDur"][value="keep"]').checked = true;
+      toggleKeyDurationMode();
       document.getElementById('keySaveBtn').innerHTML = '<i class="ti ti-device-floppy" aria-hidden="true"></i> Mettre à jour la clé';
       document.getElementById('keyMsg').innerHTML = '';
       document.getElementById('keyExistsHint').textContent = '';
@@ -823,12 +834,31 @@
       if (!key) { alert("Merci de saisir ou générer une clé."); return; }
       if (!/^[A-Za-z0-9_-]+$/.test(key)) { alert("La clé ne doit contenir que lettres, chiffres, tirets ou underscores (pas d'espace)."); return; }
 
-      const { expiresAt, planLabel } = computeExpiryFromMode('key');
       const isEdit = !!editingKey;
+      const durMode = document.querySelector('input[name="keyDur"]:checked').value;
+      const existing = licensesCache[key] || {};
+
+      // Mode "Conserver la durée actuelle" (uniquement possible en édition) :
+      // on reprend expiresAt/planLabel/active tels quels, sans rien recalculer -
+      // c'est ce qui empêche une simple correction de nom/contact de réinitialiser
+      // silencieusement l'abonnement du client (bug corrigé : avant, le formulaire
+      // renvoyait TOUJOURS la durée du mode actuellement sélectionné, même 24h par
+      // défaut, quelle que soit l'intention réelle de l'admin).
+      let expiresAt, planLabel, active;
+      if (isEdit && durMode === 'keep') {
+        expiresAt = existing.expiresAt || 0;
+        planLabel = existing.planLabel || '';
+        active = existing.active !== undefined ? existing.active : true;
+      } else {
+        const computed = computeExpiryFromMode('key');
+        expiresAt = computed.expiresAt;
+        planLabel = computed.planLabel;
+        active = true;
+      }
 
       const finalize = (createdAt) => {
         const payload = {
-          active: true,
+          active,
           expiresAt,
           planLabel,
           customerName,
@@ -849,7 +879,6 @@
 
       if (isEdit) {
         // Mise à jour : on garde la date de création d'origine si connue
-        const existing = licensesCache[key] || {};
         finalize(existing.createdAt);
       } else {
         // Création : on bloque les doublons de clés
