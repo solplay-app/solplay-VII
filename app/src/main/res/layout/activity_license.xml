@@ -144,15 +144,6 @@
         android:text="Copier la cle appareil" />
 
     <Button
-        android:id="@+id/btnContactUs"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:backgroundTint="@color/solplay_orange"
-        android:text="@string/btn_contact_us"
-        android:textColor="@color/solplay_white" />
-
-    <Button
         android:id="@+id/btnVerifyActivation"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
