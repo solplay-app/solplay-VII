@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Fond arrondi utilisé comme "outline" pour le clipToOutline des affiches
-     (films/séries) de la nouvelle rangée d'accueil façon Netflix. -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <solid android:color="@color/solplay_gray" />
-    <corners android:radius="10dp" />
-</shape>
