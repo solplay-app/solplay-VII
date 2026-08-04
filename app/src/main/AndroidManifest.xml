@@ -30,7 +30,10 @@
         <activity android:name=".PlaylistActivity" android:exported="false" />
         <activity android:name=".PlaylistsListActivity" android:exported="false" />
         <activity android:name=".RedeemCodeActivity" android:exported="false" />
-        <activity android:name=".HomeActivity" android:exported="false" />
+        <activity
+            android:name=".HomeActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
         <activity android:name=".ChannelsActivity" android:exported="false" />
         <activity android:name=".EpgGridActivity" android:exported="false" />
        
