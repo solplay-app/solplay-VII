@@ -130,14 +130,14 @@ class HomeActivity : AppCompatActivity() {
             // Pas encore de films chargés (playlist vide/pas encore synchronisée) :
             // on laisse simplement la rangée et le libellé masqués plutôt que
             // d'afficher une bannière/section vide.
-            binding.tvPosterSectionLabel.visibility = View.GONE
-            binding.recyclerHomePosters.visibility = View.GONE
+            binding.tvPosterSectionLabel?.visibility = View.GONE
+            binding.recyclerHomePosters?.visibility = View.GONE
             return
         }
 
-        binding.tvPosterSectionLabel.visibility = View.VISIBLE
-        binding.recyclerHomePosters.visibility = View.VISIBLE
-        binding.recyclerHomePosters.layoutManager =
+        binding.tvPosterSectionLabel?.visibility = View.VISIBLE
+        binding.recyclerHomePosters?.visibility = View.VISIBLE
+        binding.recyclerHomePosters?.layoutManager =
             LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
 
         val adapter = ChannelAdapter(
@@ -145,17 +145,17 @@ class HomeActivity : AppCompatActivity() {
             itemLayoutRes = R.layout.item_home_poster
         ) { channel -> playFromHome(channel) }
         homePosterAdapter = adapter
-        binding.recyclerHomePosters.adapter = adapter
+        binding.recyclerHomePosters?.adapter = adapter
 
         setupHeroBanner(movies.first())
     }
 
     /** Affiche l'affiche + le titre du premier film de la rangée en grand format en haut de l'écran. */
     private fun setupHeroBanner(channel: Channel) {
-        binding.tvHeroTitle.text = TmdbClient.cleanTitle(channel.name).ifBlank { channel.name }
+        binding.tvHeroTitle?.text = TmdbClient.cleanTitle(channel.name).ifBlank { channel.name }
 
         if (!channel.logoUrl.isNullOrEmpty()) {
-            binding.ivHeroBackdrop.load(channel.logoUrl, ImageLoader.get(this)) {
+            binding.ivHeroBackdrop?.load(channel.logoUrl, ImageLoader.get(this)) {
                 listener(onError = { _, _ -> loadHeroFromTmdb(channel) })
             }
         } else {
@@ -168,7 +168,7 @@ class HomeActivity : AppCompatActivity() {
             val result = TmdbClient.searchMovie(channel.name)
             val posterUrl = result.info?.posterUrl ?: return@launch
             if (isFinishing) return@launch
-            binding.ivHeroBackdrop.load(posterUrl, ImageLoader.get(this@HomeActivity))
+            binding.ivHeroBackdrop?.load(posterUrl, ImageLoader.get(this@HomeActivity))
         }
     }
 
