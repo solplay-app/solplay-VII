@@ -62,6 +62,21 @@ class PlayerActivity : AppCompatActivity() {
     private val maxQuickRetries = 2
 
     /**
+     * CORRECTIF (bug "la liste des films sort quand j'avance le film") :
+     * la flèche droite de la télécommande servait à la fois à faire
+     * avancer la lecture ET à ouvrir le panneau de liste, ce qui faisait
+     * apparaître la liste au lieu de faire avancer le film/série. Le
+     * panneau ne doit s'ouvrir que sur un double-appui rapide du bouton OK
+     * (comme sur une télécommande TV/Android box classique) ; la flèche
+     * droite/gauche sert désormais uniquement à avancer/reculer la lecture
+     * en VOD (film/série), et au zapping direct en live (déjà géré par
+     * haut/bas).
+     */
+    private var lastOkPressTime = 0L
+    private val doubleOkThresholdMs = 400L
+    private val seekStepMs = 10_000L
+
+    /**
      * CORRECTIF (bug "coupure en pleine lecture, obligé de reprendre la
      * télécommande" + "impossible de relire avant 10 minutes ou plus") :
      * une fois les tentatives rapides ET le rafraîchissement de playlist
@@ -448,19 +463,43 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Avance/recule la lecture d'un film ou d'une série d'un pas fixe.
+     * Sans effet en direct (live), où avancer/reculer n'a pas de sens.
+     */
+    private fun seekRelative(deltaMs: Long) {
+        val exo = player ?: return
+        if (currentChannel?.contentType() == ContentType.LIVE) return
+        val duration = exo.duration
+        var target = exo.currentPosition + deltaMs
+        if (target < 0L) target = 0L
+        if (duration != androidx.media3.common.C.TIME_UNSET && target > duration) target = duration
+        exo.seekTo(target)
+        showControlsTemporarily()
+    }
+
     // ──────────────────────────────────────────────────────────
     // Navigation télécommande D-pad
     // ──────────────────────────────────────────────────────────
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         return when (keyCode) {
-            // OK / Centre → affiche les contrôles (même comportement que tap écran)
+            // OK / Centre → simple appui : affiche les contrôles.
+            // Double appui rapide (< 400ms) : ouvre le panneau de liste
+            // (chaînes en live, ou films/séries en VOD).
             KeyEvent.KEYCODE_DPAD_CENTER,
             KeyEvent.KEYCODE_ENTER -> {
                 if (binding.channelListPanel.visibility == View.VISIBLE) {
                     // Le panneau est ouvert : laisser le RecyclerView gérer la sélection
                     super.onKeyDown(keyCode, event)
                 } else {
-                    showControlsTemporarily()
+                    val now = System.currentTimeMillis()
+                    if (now - lastOkPressTime <= doubleOkThresholdMs) {
+                        lastOkPressTime = 0L
+                        toggleSidePanel()
+                    } else {
+                        lastOkPressTime = now
+                        showControlsTemporarily()
+                    }
                     true
                 }
             }
@@ -469,22 +508,29 @@ class PlayerActivity : AppCompatActivity() {
             KeyEvent.KEYCODE_DPAD_UP   -> { navigateChannel(-1); true }
             KeyEvent.KEYCODE_DPAD_DOWN -> { navigateChannel(+1); true }
 
-            // Flèche droite → ouvre le panneau chaînes
+            // Flèche droite → avance la lecture (VOD) ; ne fait plus sortir
+            // la liste, qui s'ouvre désormais uniquement via double-OK.
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                if (binding.channelListPanel.visibility != View.VISIBLE) {
-                    toggleSidePanel()
+                if (binding.channelListPanel.visibility == View.VISIBLE) {
+                    super.onKeyDown(keyCode, event)
+                } else {
+                    seekRelative(seekStepMs)
                     true
-                } else super.onKeyDown(keyCode, event)
+                }
             }
 
-            // Flèche gauche / Retour → ferme le panneau si ouvert, sinon quitte
+            // Flèche gauche → recule la lecture (VOD) si le panneau est
+            // fermé ; ferme le panneau s'il est ouvert.
             KeyEvent.KEYCODE_DPAD_LEFT -> {
                 if (binding.channelListPanel.visibility == View.VISIBLE) {
                     binding.channelListPanel.visibility = View.GONE
                     binding.etSideSearch.text?.clear()
                     showControlsTemporarily()
                     true
-                } else super.onKeyDown(keyCode, event)
+                } else {
+                    seekRelative(-seekStepMs)
+                    true
+                }
             }
 
             KeyEvent.KEYCODE_BACK -> {

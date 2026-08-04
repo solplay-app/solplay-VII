@@ -8,6 +8,9 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import coil.load
 import com.solplay.iptv.databinding.ActivityHomeBinding
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -106,6 +109,101 @@ class HomeActivity : AppCompatActivity() {
 
         showAccountInfo()
         refreshCacheInBackgroundIfStale()
+        setupHomePosterRow()
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // Bannière héro + rangée d'affiches (Films) de l'écran d'accueil
+    // ──────────────────────────────────────────────────────────
+
+    /** Nombre d'affiches chargées dans la rangée d'accueil (au-delà, l'utilisateur passe par "Films"). */
+    private val homeRowLimit = 25
+
+    private var homePosterAdapter: ChannelAdapter? = null
+
+    private fun setupHomePosterRow() {
+        val movies = ChannelRepository.channels
+            .filter { it.contentType() == ContentType.MOVIE }
+            .take(homeRowLimit)
+
+        if (movies.isEmpty()) {
+            // Pas encore de films chargés (playlist vide/pas encore synchronisée) :
+            // on laisse simplement la rangée et le libellé masqués plutôt que
+            // d'afficher une bannière/section vide.
+            binding.tvPosterSectionLabel.visibility = View.GONE
+            binding.recyclerHomePosters.visibility = View.GONE
+            return
+        }
+
+        binding.tvPosterSectionLabel.visibility = View.VISIBLE
+        binding.recyclerHomePosters.visibility = View.VISIBLE
+        binding.recyclerHomePosters.layoutManager =
+            LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
+
+        val adapter = ChannelAdapter(
+            movies,
+            itemLayoutRes = R.layout.item_home_poster
+        ) { channel -> playFromHome(channel) }
+        homePosterAdapter = adapter
+        binding.recyclerHomePosters.adapter = adapter
+
+        setupHeroBanner(movies.first())
+    }
+
+    /** Affiche l'affiche + le titre du premier film de la rangée en grand format en haut de l'écran. */
+    private fun setupHeroBanner(channel: Channel) {
+        binding.tvHeroTitle.text = TmdbClient.cleanTitle(channel.name).ifBlank { channel.name }
+
+        if (!channel.logoUrl.isNullOrEmpty()) {
+            binding.ivHeroBackdrop.load(channel.logoUrl, ImageLoader.get(this)) {
+                listener(onError = { _, _ -> loadHeroFromTmdb(channel) })
+            }
+        } else {
+            loadHeroFromTmdb(channel)
+        }
+    }
+
+    private fun loadHeroFromTmdb(channel: Channel) {
+        lifecycleScope.launch {
+            val result = TmdbClient.searchMovie(channel.name)
+            val posterUrl = result.info?.posterUrl ?: return@launch
+            if (isFinishing) return@launch
+            binding.ivHeroBackdrop.load(posterUrl, ImageLoader.get(this@HomeActivity))
+        }
+    }
+
+    /** Lance la lecture d'un film choisi directement depuis la rangée d'accueil. */
+    private fun playFromHome(channel: Channel) {
+        if (ParentalControl.isAdultChannel(channel) && !ParentalControl.isUnlocked()) {
+            showHomeParentalPinDialog { playFromHome(channel) }
+            return
+        }
+        ChannelRepository.setPlayingList(homePosterAdapter?.currentList() ?: listOf(channel))
+        val intent = Intent(this, PlayerActivity::class.java)
+        intent.putExtra(PlayerActivity.EXTRA_STREAM_URL, channel.streamUrl)
+        intent.putExtra(PlayerActivity.EXTRA_STREAM_NAME, channel.name)
+        startActivity(intent)
+    }
+
+    private fun showHomeParentalPinDialog(onGranted: () -> Unit) {
+        val input = android.widget.EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            hint = "Code parental (4 chiffres)"
+            filters = arrayOf(android.text.InputFilter.LengthFilter(4))
+        }
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("🔒 Contenu protégé")
+            .setView(input)
+            .setPositiveButton("Valider") { _, _ ->
+                if (ParentalControl.verifyPin(this, input.text.toString())) {
+                    ParentalControl.unlock()
+                    onGranted()
+                } else {
+                    Toast.makeText(this, "Code incorrect.", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Annuler", null)
+            .show()
     }
 
     private fun openChannels(type: ContentType) {
