@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Voile dégradé bas de la bannière héro : transparent en haut, sombre en
+     bas, pour que le titre du film reste lisible quel que soit le contenu
+     de l'image d'arrière-plan (comme sur les interfaces type Netflix). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:type="linear"
+        android:angle="90"
+        android:startColor="#00020814"
+        android:centerColor="#B0020814"
+        android:endColor="#F5020814" />
+</shape>

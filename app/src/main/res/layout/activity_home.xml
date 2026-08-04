@@ -1,349 +1,309 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Écran d'accueil "grille orange plate" : grille 2 colonnes x 3 rangées,
-    tuiles CARRÉES - Live TV / Films, Séries / Compte, Changer serveur / Replay.
-    Style repris du mockup solplay-iptv.html : icônes vectorielles ligne
-    blanche (au lieu d'emoji) + effet "pop" (agrandissement + ombre légère)
-    au focus télécommande/clic (voir @animator/tile_focus_pop), en plus du
-    fond orange -> vert déjà en place (bg_home_tile.xml).
+    Écran d'accueil "affiches" façon Netflix / Android TV : bannière héro
+    (affiche du premier film) en haut, rangée horizontale d'affiches en
+    dessous, menu d'icônes vertical à gauche (TV Live / Films / Séries /
+    Compte / Actualiser). Remplace l'ancienne grille de tuiles orange.
+
+    Les IDs historiques (tileLiveTv, tileMovies, tileSeries, tileAccount,
+    tileChangeServer, tileFavorites, tileSettings, tileHistory, tileResume,
+    tvResumeLabel, tvClock, tvConnectedAs, tvExpiration) sont conservés afin
+    que HomeActivity.kt continue de fonctionner sans changement de logique.
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="@drawable/bg_home_screen">
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="26dp"
-        android:background="@color/solplay_orange" />
-
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingStart="22dp"
-        android:paddingEnd="22dp"
-        android:paddingTop="18dp"
-        android:paddingBottom="10dp">
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
 
-        <ImageView
-            android:layout_width="50dp"
-            android:layout_height="50dp"
-            android:layout_marginEnd="14dp"
-            android:src="@drawable/ic_solplay_logo"
-            android:contentDescription="SOLPLAY" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="SOLPLAY"
-            android:textColor="@color/solplay_white"
-            android:textStyle="bold"
-            android:textSize="23sp" />
-
-        <TextView
-            android:id="@+id/tvClock"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="end"
-            android:text=""
-            android:textColor="@color/solplay_white"
-            android:textSize="1sp"
-            android:visibility="gone" />
-
-    </LinearLayout>
-
-    <!-- Conservés pour ActivityHomeBinding (code existant) - fonctions
-         retirées de cette maquette, invisibles, sans effet. -->
-    <LinearLayout
-        android:id="@+id/tileAccount"
-        android:layout_width="1dp"
-        android:layout_height="1dp"
-        android:background="@android:color/transparent"
-        android:clickable="false"
-        android:focusable="false"
-        android:visibility="gone" />
-
-    <LinearLayout
-        android:id="@+id/tileChangeServer"
-        android:layout_width="1dp"
-        android:layout_height="1dp"
-        android:background="@android:color/transparent"
-        android:clickable="false"
-        android:focusable="false"
-        android:visibility="gone" />
-
-    <!-- Grille 2 colonnes x 3 rangées, tuiles carrées -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:paddingTop="4dp"
-        android:paddingBottom="4dp">
-
-        <!-- Rangée 1 : Live TV | Films -->
+        <!-- ── Menu latéral (icônes) ── -->
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
+            android:layout_width="78dp"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:background="#26000000">
 
-            <LinearLayout
+            <View
+                android:layout_width="1dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <ImageView
                 android:id="@+id/tileLiveTv"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_margin="6dp"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:background="@drawable/bg_home_tile"
-                android:stateListAnimator="@animator/tile_focus_pop"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_marginBottom="20dp"
+                android:padding="13dp"
+                android:background="@drawable/bg_icon_circle"
+                android:src="@drawable/ic_tile_live"
+                android:focusable="true"
                 android:clickable="true"
-                android:focusable="true">
+                android:stateListAnimator="@animator/tile_focus_pop"
+                android:contentDescription="TV Live" />
 
-                <ImageView
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:src="@drawable/ic_tile_live"
-                    android:contentDescription="TV LIVE" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="TV LIVE"
-                    android:textAllCaps="true"
-                    android:textColor="@color/solplay_white"
-                    android:textStyle="bold"
-                    android:textSize="22sp"
-                    android:letterSpacing="0.08" />
-            </LinearLayout>
-
-            <LinearLayout
+            <ImageView
                 android:id="@+id/tileMovies"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_margin="6dp"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:background="@drawable/bg_home_tile"
-                android:stateListAnimator="@animator/tile_focus_pop"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_marginBottom="20dp"
+                android:padding="13dp"
+                android:background="@drawable/bg_icon_circle"
+                android:src="@drawable/ic_tile_films"
+                android:focusable="true"
                 android:clickable="true"
-                android:focusable="true">
+                android:stateListAnimator="@animator/tile_focus_pop"
+                android:contentDescription="Films" />
 
-                <ImageView
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:src="@drawable/ic_tile_films"
-                    android:contentDescription="Films" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="Films"
-                    android:textColor="@color/solplay_white"
-                    android:textStyle="bold"
-                    android:textSize="16sp" />
-            </LinearLayout>
-
-        </LinearLayout>
-
-        <!-- Rangée 2 : Séries | Compte -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
-
-            <LinearLayout
+            <ImageView
                 android:id="@+id/tileSeries"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_margin="6dp"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:background="@drawable/bg_home_tile"
-                android:stateListAnimator="@animator/tile_focus_pop"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_marginBottom="20dp"
+                android:padding="13dp"
+                android:background="@drawable/bg_icon_circle"
+                android:src="@drawable/ic_tile_series"
+                android:focusable="true"
                 android:clickable="true"
-                android:focusable="true">
-
-                <ImageView
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:src="@drawable/ic_tile_series"
-                    android:contentDescription="Séries" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="Séries"
-                    android:textColor="@color/solplay_white"
-                    android:textStyle="bold"
-                    android:textSize="16sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/tileFavorites"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_margin="6dp"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:background="@drawable/bg_home_tile"
                 android:stateListAnimator="@animator/tile_focus_pop"
+                android:contentDescription="Séries" />
+
+            <ImageView
+                android:id="@+id/tileAccount"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_marginBottom="20dp"
+                android:padding="13dp"
+                android:background="@drawable/bg_icon_circle"
+                android:src="@drawable/ic_tile_account"
+                android:focusable="true"
                 android:clickable="true"
-                android:focusable="true">
+                android:stateListAnimator="@animator/tile_focus_pop"
+                android:contentDescription="Compte" />
 
-                <ImageView
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:src="@drawable/ic_tile_account"
-                    android:contentDescription="Compte" />
+            <ImageView
+                android:id="@+id/tileChangeServer"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:padding="13dp"
+                android:background="@drawable/bg_icon_circle"
+                android:src="@drawable/ic_tile_changeserver"
+                android:focusable="true"
+                android:clickable="true"
+                android:stateListAnimator="@animator/tile_focus_pop"
+                android:contentDescription="Actualiser" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="Compte"
-                    android:textColor="@color/solplay_white"
-                    android:textStyle="bold"
-                    android:textSize="16sp" />
-            </LinearLayout>
+            <View
+                android:layout_width="1dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
 
         </LinearLayout>
 
-        <!-- Rangée 3 : Changer serveur | Replay -->
+        <!-- ── Contenu principal ── -->
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical">
 
+            <!-- Barre du haut : logo + raccourcis secondaires -->
             <LinearLayout
-                android:id="@+id/tileSettings"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_margin="6dp"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:background="@drawable/bg_home_tile"
-                android:stateListAnimator="@animator/tile_focus_pop"
-                android:clickable="true"
-                android:focusable="true">
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:paddingTop="14dp"
+                android:paddingBottom="6dp">
 
                 <ImageView
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:src="@drawable/ic_tile_changeserver"
-                    android:contentDescription="Changer serveur" />
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:layout_marginEnd="10dp"
+                    android:src="@drawable/ic_solplay_logo"
+                    android:contentDescription="SOLPLAY" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="Changer serveur"
+                    android:text="SOLPLAY"
+                    android:textColor="@color/solplay_white"
+                    android:textStyle="bold"
+                    android:textSize="17sp" />
+
+                <TextView
+                    android:id="@+id/tvClock"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="end"
+                    android:text=""
+                    android:textColor="@color/solplay_white"
+                    android:textSize="1sp"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="end"
+                    android:layout_marginEnd="14dp">
+
+                    <TextView
+                        android:id="@+id/tvConnectedAs"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/solplay_white_60"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/tvExpiration"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/solplay_white_60"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:id="@+id/tileHistory"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="10dp"
+                    android:padding="10dp"
+                    android:background="@drawable/bg_icon_circle"
+                    android:src="@drawable/ic_tile_replay"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:stateListAnimator="@animator/tile_focus_pop"
+                    android:contentDescription="Replay" />
+
+                <ImageView
+                    android:id="@+id/tileFavorites"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="10dp"
+                    android:padding="10dp"
+                    android:background="@drawable/bg_icon_circle"
+                    android:src="@drawable/ic_tile_star"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:stateListAnimator="@animator/tile_focus_pop"
+                    android:contentDescription="Favoris" />
+
+                <ImageView
+                    android:id="@+id/tileSettings"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:padding="10dp"
+                    android:background="@drawable/bg_icon_circle"
+                    android:src="@drawable/ic_tile_playlist"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:stateListAnimator="@animator/tile_focus_pop"
+                    android:contentDescription="Changer de serveur" />
+
+            </LinearLayout>
+
+            <!-- Bannière "Reprendre" (visible seulement si une lecture récente existe) -->
+            <LinearLayout
+                android:id="@+id/tileResume"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="18dp"
+                android:layout_marginEnd="18dp"
+                android:layout_marginBottom="6dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_pill_green"
+                android:clickable="true"
+                android:focusable="true"
+                android:stateListAnimator="@animator/tile_focus_pop"
+                android:padding="12dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/tvResumeLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Reprendre"
                     android:textColor="@color/solplay_white"
                     android:textStyle="bold"
                     android:textSize="14sp"
+                    android:ellipsize="end"
                     android:maxLines="1" />
             </LinearLayout>
 
-            <LinearLayout
-                android:id="@+id/tileHistory"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_margin="6dp"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:background="@drawable/bg_home_tile"
-                android:stateListAnimator="@animator/tile_focus_pop"
-                android:clickable="true"
-                android:focusable="true">
+            <!-- ── Bannière héro (affiche du film mis en avant) ── -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="55">
 
                 <ImageView
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:src="@drawable/ic_tile_replay"
-                    android:contentDescription="Replay" />
+                    android:id="@+id/ivHeroBackdrop"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:background="@color/solplay_gray"
+                    android:contentDescription="Affiche mise en avant" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_hero_scrim" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:id="@+id/tvHeroTitle"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="Replay"
+                    android:layout_gravity="bottom"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp"
+                    android:paddingBottom="10dp"
                     android:textColor="@color/solplay_white"
                     android:textStyle="bold"
-                    android:textSize="16sp" />
-            </LinearLayout>
+                    android:textSize="20sp"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:shadowColor="#CC000000"
+                    android:shadowDx="0"
+                    android:shadowDy="1"
+                    android:shadowRadius="4" />
 
-        </LinearLayout>
+            </FrameLayout>
 
-        <!-- Tuile Reprendre (visible uniquement si une lecture récente existe) -->
-        <LinearLayout
-            android:id="@+id/tileResume"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:background="@color/solplay_orange"
-            android:clickable="true"
-            android:focusable="true"
-            android:padding="12dp"
-            android:visibility="gone">
-
+            <!-- ── Rangée horizontale d'affiches (Films) ── -->
             <TextView
-                android:id="@+id/tvResumeLabel"
+                android:id="@+id/tvPosterSectionLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Reprendre"
+                android:layout_marginStart="18dp"
+                android:layout_marginTop="14dp"
+                android:layout_marginBottom="8dp"
+                android:text="Films"
                 android:textColor="@color/solplay_white"
                 android:textStyle="bold"
-                android:textSize="14sp"
-                android:ellipsize="end"
-                android:maxLines="1" />
+                android:textSize="15sp"
+                android:visibility="gone" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerHomePosters"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="45"
+                android:clipToPadding="false"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp" />
+
         </LinearLayout>
 
     </LinearLayout>
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingStart="22dp"
-        android:paddingEnd="22dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="14dp">
-
-        <TextView
-            android:id="@+id/tvExpiration"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textColor="@color/solplay_white"
-            android:textSize="12sp" />
-
-        <TextView
-            android:id="@+id/tvConnectedAs"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="@color/solplay_white"
-            android:textSize="12sp" />
-    </LinearLayout>
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="28dp"
-        android:background="@color/solplay_orange" />
-
-</LinearLayout>
+</FrameLayout>
