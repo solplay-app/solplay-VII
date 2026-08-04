@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Icône de notification : Android exige une silhouette simple en aplat blanc
+    (le système ignore les couleurs sur API 21+), contrairement à l'icône
+    principale de l'app (@mipmap/ic_launcher) qui peut être une image détaillée.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M8,5v14l11,-7z"/>
+</vector>

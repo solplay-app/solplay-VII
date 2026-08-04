@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Élément d'affiche pour la rangée horizontale de l'écran d'accueil
+     (films/séries), style Netflix/Android TV. Réutilise volontairement les
+     mêmes IDs que item_channel.xml (ivChannelLogo, tvChannelName,
+     tvChannelGroup, tvProgramInfo) pour rester compatible avec
+     ChannelAdapter tel quel (affiche M3U + repli TMDB déjà en place). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="126dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:layout_marginEnd="14dp"
+    android:padding="4dp"
+    android:focusable="true"
+    android:clickable="true"
+    android:background="@drawable/bg_poster_item_selector"
+    android:stateListAnimator="@animator/tile_focus_pop">
+
+    <ImageView
+        android:id="@+id/ivChannelLogo"
+        android:layout_width="match_parent"
+        android:layout_height="168dp"
+        android:scaleType="centerCrop"
+        android:background="@drawable/bg_rounded_poster"
+        android:clipToOutline="true" />
+
+    <TextView
+        android:id="@+id/tvChannelName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textColor="@color/solplay_white"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <!-- Non affichés dans ce mode affiche, mais requis : ChannelAdapter y
+         écrit toujours le groupe/le programme en cours (sans effet visuel
+         puisque gone). -->
+    <TextView
+        android:id="@+id/tvChannelGroup"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tvProgramInfo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+</LinearLayout>
