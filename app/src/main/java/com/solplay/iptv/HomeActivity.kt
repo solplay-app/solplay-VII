@@ -68,7 +68,7 @@ class HomeActivity : AppCompatActivity() {
         // Boutons secondaires visibles sur les maquettes.
         binding.tileChangeServer.setOnClickListener { refreshEpgAndChannels() }
         binding.tileFavorites.setOnClickListener {
-            startActivity(Intent(this, AboutActivity::class.java))
+            startActivity(Intent(this, FavoritesActivity::class.java))
         }
         binding.tileHistory.setOnClickListener { openCatchupShortcut() }
 

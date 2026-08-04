@@ -1,6 +1,10 @@
 package com.solplay.iptv
 
 import android.app.AlertDialog
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkRequest
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -18,6 +22,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.solplay.iptv.databinding.ActivityPlayerBinding
@@ -166,12 +171,71 @@ class PlayerActivity : AppCompatActivity() {
         startAssignmentWatcher()
     }
 
+    /**
+     * Construit un MediaItem avec un ciblage explicite du "direct" (live
+     * edge), au lieu du comportement par défaut d'ExoPlayer.
+     *
+     * Sans ça, un flux live IPTV visionné pendant plusieurs heures d'affilée
+     * a tendance à dériver de plus en plus loin derrière le vrai direct (le
+     * buffer s'accumule progressivement) - un défaut classique des flux
+     * live mal configurés, que les vraies apps IPTV corrigent en donnant à
+     * ExoPlayer une cible de latence à maintenir : le lecteur ajuste alors
+     * très légèrement sa vitesse de lecture (imperceptible à l'oreille/l'œil)
+     * pour rattraper ou ralentir automatiquement et rester proche de cette
+     * cible, plutôt que de dériver sans contrôle.
+     */
+    private fun buildLiveMediaItem(url: String): MediaItem =
+        MediaItem.Builder()
+            .setUri(url)
+            .setLiveConfiguration(
+                MediaItem.LiveConfiguration.Builder()
+                    .setTargetOffsetMs(12_000) // ~12s derrière le direct : marge raisonnable pour absorber les micro-coupures sans lag perceptible
+                    .setMinPlaybackSpeed(0.98f)
+                    .setMaxPlaybackSpeed(1.04f)
+                    .build()
+            )
+            .build()
+
+    /**
+     * Configuration du buffer ExoPlayer adaptée à l'IPTV, au lieu des
+     * réglages par défaut (pensés pour du streaming classique type
+     * YouTube/Netflix, sur des CDN stables).
+     *
+     * Les serveurs IPTV sont généralement bien moins stables (coupures,
+     * ralentissements plus fréquents) - mais paradoxalement, un buffer trop
+     * GRAND (les 50 secondes par défaut d'ExoPlayer) est contre-productif
+     * en direct : ça prend du temps à se remplir au démarrage/changement de
+     * chaîne (lecture qui met du temps à commencer), et fait prendre du
+     * retard sur le direct au fil du temps. On réduit donc le buffer cible
+     * ET le temps nécessaire avant de démarrer/reprendre la lecture, pour
+     * un ressenti plus proche des lecteurs IPTV du marché (TiviMate,
+     * IPTV Smarters) :
+     * - minBufferMs (15s) / maxBufferMs (30s) : buffer cible plus modeste
+     *   que les 50s par défaut - suffisant pour absorber les instabilités
+     *   réseau typiques d'un flux IPTV, sans accumuler un retard excessif
+     *   sur le direct.
+     * - bufferForPlaybackMs (1.5s) : ce qu'il faut en buffer pour DÉMARRER
+     *   la lecture (par défaut 2.5s) - légèrement réduit pour un démarrage
+     *   plus rapide au changement de chaîne.
+     * - bufferForPlaybackAfterRebufferMs (3s) : ce qu'il faut en buffer
+     *   pour REPRENDRE après une coupure (par défaut 5s) - réduit pour une
+     *   reprise plus rapide après les micro-coupures fréquentes en IPTV.
+     */
+    private val iptvLoadControl by lazy {
+        DefaultLoadControl.Builder()
+            .setBufferDurationsMs(15_000, 30_000, 1_500, 3_000)
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+    }
+
     // ──────────────────────────────────────────────────────────
     // Création / recréation du lecteur
     // ──────────────────────────────────────────────────────────
     private fun initPlayer() {
         if (player != null) return // déjà prêt (ex: tout premier onCreate)
-        player = ExoPlayer.Builder(this).build().also { exo ->
+        player = ExoPlayer.Builder(this)
+            .setLoadControl(iptvLoadControl)
+            .build().also { exo ->
             binding.playerView.player = exo
             exo.addListener(object : Player.Listener {
 
@@ -182,9 +246,18 @@ class PlayerActivity : AppCompatActivity() {
                             showBuffering(false)
                             binding.errorOverlay.visibility = View.GONE
                             cancelBackgroundRetry()
-                            // La lecture est repartie normalement : on remet le compteur
-                            // de tentatives rapides à zéro pour la prochaine coupure.
+                            // La lecture est repartie normalement : on remet à zéro
+                            // TOUS les drapeaux de récupération (pas seulement
+                            // quickRetryCount). hasRetriedAfterRefresh manquait ici :
+                            // sans ça, l'étape "rafraîchir la playlist" (handlePlaybackError,
+                            // étape 2) restait sautée pour le reste de la session après
+                            // sa première utilisation, même réussie - le filet de
+                            // sécurité (réessai en arrière-plan) rattrapait déjà le
+                            // coup dans ce cas, mais autant remettre cette étape
+                            // intermédiaire disponible aussi, pour une récupération
+                            // plus rapide (avant le délai de 30s du réessai en fond).
                             quickRetryCount = 0
+                            hasRetriedAfterRefresh = false
                             // Reprise VOD : seek au point mémorisé, consommé une seule fois.
                             val resumePos = resumePosForNextReady
                             if (resumePos > 0 && exo.currentPosition < 1000) {
@@ -219,6 +292,7 @@ class PlayerActivity : AppCompatActivity() {
      */
     override fun onStart() {
         super.onStart()
+        registerNetworkCallback()
         if (player == null) {
             val ch = currentChannel
             initPlayer()
@@ -228,6 +302,48 @@ class PlayerActivity : AppCompatActivity() {
                 playStreamInternal(ch.streamUrl, ch.name)
             }
         }
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // Détection réseau réelle (au lieu d'attendre le prochain cycle
+    // de réessai programmé, jusqu'à 30s de délai à l'aveugle)
+    // ──────────────────────────────────────────────────────────
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
+    /**
+     * S'abonne aux changements réels de connectivité : dès que le réseau
+     * revient (Wi-Fi/4G qui se reconnecte), on relance IMMÉDIATEMENT la
+     * lecture si l'écran d'erreur est affiché - plutôt que d'attendre le
+     * prochain cycle programmé du réessai en arrière-plan (jusqu'à 30s
+     * d'attente inutile alors que le réseau est déjà revenu).
+     */
+    private fun registerNetworkCallback() {
+        if (networkCallback != null) return
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                runOnUiThread {
+                    if (!isFinishing && binding.errorOverlay.visibility == View.VISIBLE) {
+                        retryCurrentChannelNow()
+                    }
+                }
+            }
+        }
+        try {
+            cm.registerNetworkCallback(NetworkRequest.Builder().build(), callback)
+            networkCallback = callback
+        } catch (e: Exception) {
+            // Certains appareils/ROM restreignent cette API - le réessai
+            // programmé en arrière-plan reste le filet de sécurité normal.
+        }
+    }
+
+    private fun unregisterNetworkCallback() {
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        networkCallback?.let { cb ->
+            try { cm?.unregisterNetworkCallback(cb) } catch (e: Exception) { /* déjà désenregistré */ }
+        }
+        networkCallback = null
     }
 
     // ──────────────────────────────────────────────────────────
@@ -399,16 +515,26 @@ class PlayerActivity : AppCompatActivity() {
     // Préchargement des chaînes voisines (zapping instantané)
     // ──────────────────────────────────────────────────────────
 
-    /** URLs des chaînes juste avant/après [currentChannel] dans la liste, uniquement si Live. */
+    /** URL de la chaîne juste après [currentChannel] dans la liste, uniquement si Live. */
     private fun neighborLiveUrls(): List<String> {
         val url = currentChannel?.streamUrl ?: return emptyList()
         val idx = sideChannels.indexOfFirst { it.streamUrl == url }
         if (idx < 0) return emptyList()
-        val neighbors = listOfNotNull(sideChannels.getOrNull(idx - 1), sideChannels.getOrNull(idx + 1))
-        return neighbors.filter { it.contentType() == ContentType.LIVE }.map { it.streamUrl }
+        // IMPORTANT (correctif) : un seul voisin préchargé (le suivant),
+        // pas deux (précédent + suivant) comme avant. De nombreux
+        // boîtiers/TV bas de gamme n'ont qu'UN SEUL décodeur vidéo matériel
+        // disponible à la fois - garder le lecteur principal + 2 lecteurs
+        // préchargés ouverts simultanément pouvait épuiser cette ressource
+        // et faire échouer la lecture juste après un changement de chaîne
+        // ("je change de chaîne, la suivante ne se lit plus"). Un seul
+        // voisin préchargé réduit ce risque tout en gardant l'essentiel du
+        // bénéfice (zapping suivant quasi instantané, le sens le plus
+        // utilisé en pratique).
+        val next = sideChannels.getOrNull(idx + 1) ?: return emptyList()
+        return if (next.contentType() == ContentType.LIVE) listOf(next.streamUrl) else emptyList()
     }
 
-    /** Prépare (sans jouer) les lecteurs des chaînes voisines, et libère ceux qui ne sont plus utiles. */
+    /** Prépare (sans jouer) le lecteur de la chaîne voisine, et libère ceux qui ne sont plus utiles. */
     private fun schedulePreloadNeighbors() {
         val wanted = neighborLiveUrls().toSet()
 
@@ -416,11 +542,25 @@ class PlayerActivity : AppCompatActivity() {
         val stale = preloadPlayers.keys - wanted
         stale.forEach { url -> preloadPlayers.remove(url)?.release() }
 
-        // Prépare les nouveaux voisins pas encore en cache.
+        // Prépare le nouveau voisin, pas encore en cache.
         for (url in wanted) {
             if (preloadPlayers.containsKey(url)) continue
-            val exo = ExoPlayer.Builder(this).build()
-            exo.setMediaItem(MediaItem.fromUri(url))
+            val exo = ExoPlayer.Builder(this)
+                .setLoadControl(iptvLoadControl)
+                .build()
+            exo.setMediaItem(buildLiveMediaItem(url))
+            // IMPORTANT (correctif) : sans ce listener, un préchargement qui
+            // échoue (réseau, décodeur indisponible...) restait bloqué en
+            // mémoire indéfiniment - potentiellement en train d'occuper une
+            // ressource vidéo dont la VRAIE lecture suivante avait besoin -
+            // jusqu'à ce qu'un autre changement de chaîne le détecte comme
+            // "plus voisin" et le libère enfin. On le libère maintenant
+            // IMMÉDIATEMENT en cas d'échec.
+            exo.addListener(object : Player.Listener {
+                override fun onPlayerError(error: PlaybackException) {
+                    preloadPlayers.remove(url)?.release()
+                }
+            })
             exo.playWhenReady = false
             exo.prepare()
             preloadPlayers[url] = exo
@@ -443,11 +583,18 @@ class PlayerActivity : AppCompatActivity() {
         player?.release()
 
         hasRetriedAfterRefresh = false
+        quickRetryCount = 0
         player = ready
         binding.playerView.player = ready
         ready.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 showBuffering(state == Player.STATE_BUFFERING)
+                if (state == Player.STATE_READY) {
+                    binding.errorOverlay.visibility = View.GONE
+                    cancelBackgroundRetry()
+                    quickRetryCount = 0
+                    hasRetriedAfterRefresh = false
+                }
             }
             override fun onPlayerError(error: PlaybackException) {
                 showBuffering(false)
@@ -604,7 +751,7 @@ class PlayerActivity : AppCompatActivity() {
             hideHandler.postDelayed({
                 if (!isFinishing) {
                     player?.apply {
-                        setMediaItem(MediaItem.fromUri(ch.streamUrl))
+                        setMediaItem(buildLiveMediaItem(ch.streamUrl))
                         prepare()
                         playWhenReady = true
                     }
@@ -745,7 +892,7 @@ class PlayerActivity : AppCompatActivity() {
         // deux lecteurs ouverts sur le même flux.
         preloadPlayers.remove(url)?.release()
         player?.apply {
-            setMediaItem(MediaItem.fromUri(url))
+            setMediaItem(buildLiveMediaItem(url))
             prepare()
             playWhenReady = true
         }
@@ -811,6 +958,7 @@ class PlayerActivity : AppCompatActivity() {
         saveResumePosition()
         hideHandler.removeCallbacks(hideControlsRunnable)
         cancelBackgroundRetry()
+        unregisterNetworkCallback()
         player?.release()
         player = null
         releaseAllPreloads()
