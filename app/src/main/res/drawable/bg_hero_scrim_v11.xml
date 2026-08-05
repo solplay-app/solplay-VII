@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Voile du panneau vedette (v11) : dégradé vertical sombre transparent →
+    quasi opaque en bas, pour reposer le titre et les CTAs sur l'image TMDB.
+    Léger halo orange-violet en haut à droite pour rappeler le glow global.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#330E1015"
+                android:endColor="#E60E1015" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="500dp"
+                android:centerX="0.85"
+                android:centerY="0.10"
+                android:startColor="#33FF7A00"
+                android:centerColor="#1AFF7A00"
+                android:endColor="#00000000" />
+        </shape>
+    </item>
+    <item android:left="0dp" android:right="220dp" android:bottom="0dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="90"
+                android:startColor="#cc0a0c12"
+                android:centerColor="#a60a0c12"
+                android:endColor="#000a0c12" />
+        </shape>
+    </item>
+</layer-list>

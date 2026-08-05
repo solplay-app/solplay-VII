@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Carte "TV en direct" : dégradé bleu (LIVE) avec halo focus liseré blanc. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="#1CB5E0"
+                android:endColor="#1E3C8C" />
+            <corners android:radius="14dp" />
+            <stroke android:width="3dp" android:color="@color/solplay_white" />
+        </shape>
+    </item>
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="#158FB3"
+                android:endColor="#162E6B" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+    <item android:state_selected="true">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="#158FB3"
+                android:endColor="#162E6B" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="#1CB5E0"
+                android:endColor="#2B5FE0" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+</selector>

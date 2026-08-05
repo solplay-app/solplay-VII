@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Petite étoile jaune/orange pour le tag "9.2" du panneau vedette. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="14dp"
+    android:height="14dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M12,2 L14.95,8.5 L22,9.27 L16.74,14.14 L18.18,21.02 L12,17.77 L5.82,21.02 L7.26,14.14 L2,9.27 L9.05,8.5 Z"
+        android:fillColor="#FFC107" />
+</vector>
