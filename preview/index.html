@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SolPlay Home v11 — Aperçu</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  /* === Tokens (alignés sur colors.xml) === */
+  :root {
+    --orange:#FF7A00; --orange-d:#E56A00; --orange-deep:#A34400;
+    --green:#2E9E4F; --green-d:#124D26;
+    --white:#FFFFFF; --white-60:rgba(255,255,255,0.60); --white-faint:rgba(255,255,255,0.10);
+    --bg-dark:#1B1D21; --bg-elev:#2A2C31;
+    --blue-light:#1CB5E0; --blue-mid:#2B5FE0; --blue-deep:#1E3C8C;
+    --violet:#7B2FF7; --violet-mid:#4B2FBF; --violet-deep:#2B2FA0;
+    --gray:#2A2C31;
+
+    /* 1dp = 1px en preview (densité moyenne Android ~ 160dpi) */
+    --gutter:14px;
+  }
+
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family:'Inter',-apple-system,"Segoe UI",Arial,sans-serif;
+    background:
+      radial-gradient(ellipse 55% 42% at 55% 42%, rgba(36,59,145,0.55) 0%, transparent 60%),
+      radial-gradient(ellipse 70% 60% at 50% 0%, rgba(7,17,43,0.30) 0%, transparent 70%),
+      linear-gradient(180deg,#06173D 0%,#020814 100%);
+    color:#ECEDF1;
+    overflow:hidden;
+  }
+
+  /* === Root layout (FrameLayout → LinearLayout horizontal) === */
+  .app { display:flex; height:100vh; width:100vw; }
+
+  /* ── Sidebar 78dp (ActivityHomeBinding side column) ── */
+  .sidebar {
+    width:78px; flex-shrink:0;
+    background:rgba(0,0,0,0.20);
+    border-right:1px solid rgba(255,255,255,0.04);
+    padding:26px 0 22px;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  .sidebar .logo {
+    width:42px; height:42px; margin-bottom:22px;
+    background:radial-gradient(circle at 30% 30%, #FF9433, var(--orange) 60%, var(--orange-d));
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 4px 18px rgba(255,122,0,0.45);
+    color:#fff;
+  }
+  .sidebar .logo i { font-size:22px; margin-left:2px;}
+  .sidebar .spacer { flex:1; }
+
+  .side-btn {
+    width:54px; height:54px; border-radius:50%;
+    background:rgba(255,255,255,0.13);
+    border:1px solid rgba(255,255,255,0.18);
+    margin-bottom:20px;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff;
+    transition:transform 0.12s ease, box-shadow 0.12s ease;
+    position:relative;
+  }
+  .side-btn i { font-size:24px; }
+  .side-btn:hover { transform:scale(1.08); }
+  .side-btn.live.active {
+    background:var(--orange);
+    border-color:#fff;
+    box-shadow:0 0 0 2px #fff, 0 4px 18px rgba(255,122,0,0.55);
+  }
+
+  /* ── Main column ── */
+  .main { flex:1; display:flex; flex-direction:column; min-width:0; }
+
+  /* ── Top bar (LinearLayout horizontal) ── */
+  .topbar {
+    display:flex; align-items:center; padding:16px 20px 8px;
+    gap:12px;
+  }
+  .brand-mark { width:36px; height:36px; border-radius:50%;
+    background:radial-gradient(circle at 30% 30%, #FF9433, var(--orange) 60%, var(--orange-d));
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 4px 18px rgba(255,122,0,0.45); }
+  .brand-mark i { color:#fff; font-size:18px; margin-left:2px;}
+  .brand-name { font-weight:800; font-size:22px; color:#fff; letter-spacing:0.01em;}
+  .brand-name span { color:var(--orange); }
+  .status-block { margin-left:auto; text-align:right; line-height:1.3; }
+  .status-block .a { color:var(--white-60); font-size:11px; }
+  .status-block .b { color:var(--white-60); font-size:11px; }
+
+  .round-btn {
+    width:42px; height:42px; border-radius:50%;
+    background:rgba(255,255,255,0.13);
+    border:1px solid rgba(255,255,255,0.10);
+    display:flex; align-items:center; justify-content:center;
+    color:var(--white-60); cursor:pointer;
+    transition:transform 0.12s ease, background 0.12s ease;
+    margin-left:10px;
+  }
+  .round-btn:hover { transform:scale(1.08); background:rgba(255,255,255,0.20); }
+  .round-btn i { font-size:18px; }
+
+  /* ── Hero row (LinearLayout horizontal, weight 55 / 40 split) ── */
+  .hero-row {
+    display:flex; flex:5.5; min-height:0;
+    padding:6px 20px;
+    gap:14px;
+  }
+
+  /* Featured panel (FrameLayout with backdrop + scrim + bottom content) */
+  .featured {
+    flex:1.45;
+    border-radius:16px;
+    overflow:hidden;
+    position:relative;
+    background:linear-gradient(135deg,rgba(30,26,46,0.6),rgba(255,122,0,0.10),rgba(14,16,21,0.6));
+    border:1px solid rgba(255,255,255,0.20);
+    box-shadow:0 12px 36px rgba(0,0,0,0.55);
+  }
+  .featured .backdrop {
+    position:absolute; inset:0;
+    background:
+      radial-gradient(circle at 80% 20%, rgba(255,122,0,0.30), transparent 55%),
+      radial-gradient(circle at 20% 90%, rgba(122,79,207,0.30), transparent 60%),
+      linear-gradient(135deg,#2A1F4F 0%,#7B2FF7 60%,#2B5FE0 100%);
+  }
+  .featured .scrim {
+    position:absolute; inset:0;
+    background:
+      linear-gradient(0deg, rgba(10,12,18,0.92) 0%, rgba(10,12,18,0.55) 35%, rgba(10,12,18,0.20) 70%, rgba(10,12,18,0.12) 100%),
+      radial-gradient(circle at 85% 10%, rgba(255,122,0,0.18), transparent 50%);
+  }
+  .featured .meta {
+    position:relative; z-index:2;
+    height:100%;
+    display:flex; flex-direction:column; justify-content:flex-end;
+    padding:20px 22px 22px;
+  }
+  .hero-badge {
+    align-self:flex-start;
+    background:rgba(255,122,0,0.20);
+    border:1px solid var(--orange);
+    color:var(--orange);
+    padding:4px 10px; border-radius:999px;
+    font-size:11px; font-weight:800;
+    letter-spacing:0.08em;
+  }
+  .hero-title {
+    font-size:34px; font-weight:900; color:#fff;
+    margin-top:8px; line-height:1.05; letter-spacing:-0.02em;
+    text-shadow:0 2px 8px rgba(0,0,0,0.6);
+  }
+  .hero-meta-row {
+    display:flex; gap:14px; margin-top:8px; flex-wrap:wrap;
+  }
+  .hero-meta-row .item { display:inline-flex; align-items:center; gap:4px;
+    color:#fff; font-size:13px; }
+  .hero-meta-row .item.dim { color:var(--white-60); }
+  .hero-meta-row i { color:var(--orange); font-size:14px; }
+  .hero-desc {
+    margin-top:8px; font-size:13px; color:#fff; line-height:1.45;
+    max-width:560px;
+  }
+  .hero-cta { display:flex; gap:10px; margin-top:14px; }
+  .btn-play {
+    background:linear-gradient(135deg,var(--orange),var(--orange-d));
+    color:#fff; font-weight:700; font-size:14px;
+    padding:11px 22px; border-radius:10px; border:none;
+    box-shadow:0 6px 20px rgba(255,122,0,0.45);
+    cursor:pointer;
+    transition:transform 0.12s ease;
+  }
+  .btn-play:hover { transform:scale(1.04); }
+  .btn-ghost {
+    background:rgba(255,255,255,0.10);
+    color:#fff; font-weight:600; font-size:14px;
+    padding:11px 18px; border-radius:10px;
+    border:1px solid rgba(255,255,255,0.35);
+    cursor:pointer;
+    transition:transform 0.12s ease;
+  }
+  .btn-ghost:hover { transform:scale(1.04); background:rgba(255,255,255,0.18); }
+
+  /* Categories cards (LinearLayout vertical stack) */
+  .cats { display:flex; flex-direction:column; flex:1; gap:6px; }
+  .cat {
+    flex:1;
+    border-radius:14px;
+    padding:16px 18px;
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    color:#fff;
+    border:1px solid transparent;
+    cursor:pointer;
+    position:relative;
+    transition:transform 0.12s ease, border-color 0.12s ease;
+  }
+  .cat:hover { transform:scale(1.02); border-color:#fff; }
+  .cat .label-tag {
+    font-size:10px; font-weight:800; text-transform:uppercase;
+    letter-spacing:0.06em; color:rgba(255,255,255,0.85);
+  }
+  .cat h2 {
+    font-size:24px; font-weight:900; letter-spacing:-0.02em; margin-top:2px;
+  }
+  .cat p { font-size:11px; color:rgba(255,255,255,0.70); margin-top:1px; }
+  .cat .icon-pill {
+    width:52px; height:52px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff;
+    background:rgba(0,0,0,0.30);
+  }
+  .cat .icon-pill i { font-size:26px; }
+  .cat.live { background:linear-gradient(135deg,var(--blue-light),var(--blue-mid)); }
+  .cat.live .icon-pill { background:var(--green); }
+  .cat.movie { background:linear-gradient(135deg,var(--orange),var(--orange-deep)); }
+  .cat.movie .icon-pill { background:var(--orange); }
+  .cat.serie { background:linear-gradient(135deg,var(--violet),var(--violet-deep)); }
+  .cat.serie .icon-pill { background:var(--violet); }
+
+  /* ── Bottom row (LinearLayout vertical, weight 40 split) ── */
+  .bottom-row {
+    flex:4; display:flex; flex-direction:column; min-height:0;
+    padding:6px 20px 14px;
+  }
+  .row-head {
+    display:flex; align-items:center; gap:10px;
+    margin-bottom:8px;
+  }
+  .row-title {
+    flex:1; font-size:14px; font-weight:700; color:#fff;
+    display:flex; align-items:center; gap:8px;
+  }
+  .row-title i { color:var(--orange); font-size:16px; }
+  .pill {
+    background:rgba(46,158,79,0.18);
+    border:1px solid var(--green);
+    color:var(--green);
+    font-size:10px; font-weight:800;
+    padding:4px 10px; border-radius:999px;
+    letter-spacing:0.05em;
+  }
+  .poster-row {
+    display:grid; grid-template-columns:repeat(6, 1fr); gap:14px;
+    flex:1; min-height:0;
+  }
+  .poster {
+    border-radius:12px; overflow:hidden;
+    background:linear-gradient(135deg, var(--gray), #1A1D24);
+    border:1px solid rgba(255,255,255,0.08);
+    display:flex; flex-direction:column;
+    cursor:pointer;
+    position:relative;
+    transition:transform 0.12s ease, border-color 0.12s ease;
+  }
+  .poster:hover { transform:scale(1.04); border-color:var(--orange); }
+  .poster .pic {
+    flex:1; min-height:0;
+    background-size:cover; background-position:center;
+    border-bottom:1px solid rgba(0,0,0,0.30);
+  }
+  .poster .pic.a { background:linear-gradient(135deg,#1E6FB8,#0E2540); }
+  .poster .pic.b { background:linear-gradient(135deg,#241844,#5B2CB3); }
+  .poster .pic.c { background:linear-gradient(135deg,#7A2418,#3A0E08); }
+  .poster .pic.d { background:linear-gradient(135deg,#1E4F36,#0E2A1C); }
+  .poster .pic.e { background:linear-gradient(135deg,#243B91,#0E1B47); }
+  .poster .pic.f { background:linear-gradient(135deg,#3B2F7B,#1F1B50); }
+
+  .poster .tag {
+    position:absolute; top:8px; left:8px;
+    font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em;
+    padding:3px 6px; border-radius:4px;
+    background:rgba(0,0,0,0.65); color:#fff;
+  }
+  .poster .name {
+    background:rgba(0,0,0,0.65);
+    color:#fff; font-size:11px; font-weight:600;
+    padding:6px 8px; line-height:1.25;
+  }
+  .poster .bar {
+    height:3px;
+    background:var(--orange);
+  }
+  .poster.green .bar { background:var(--green); }
+  .poster.violet .bar { background:var(--violet); }
+
+  /* === Responsive : phone (small) keeps the same blocks but stacked === */
+  @media (max-width: 880px) {
+    .sidebar { width:56px; padding-top:14px; padding-bottom:14px; }
+    .sidebar .logo { width:30px; height:30px; margin-bottom:14px; }
+    .sidebar .logo i { font-size:16px; }
+    .side-btn { width:42px; height:42px; margin-bottom:14px; }
+    .side-btn i { font-size:18px; }
+    .brand-name { font-size:16px; }
+    .status-block, .round-btn { display:none; }
+    .round-btn.shown-mobile { display:none; }
+    .hero-row { flex-direction:column; padding:4px 10px; gap:8px; }
+    .featured { flex:1.6; min-height:240px; }
+    .hero-title { font-size:22px; }
+    .hero-desc { font-size:12px; }
+    .cats { flex-direction:row; }
+    .cat h2 { font-size:16px; }
+    .cat p { display:none; }
+    .cat .icon-pill { width:36px; height:36px; }
+    .cat .icon-pill i { font-size:18px; }
+    .poster-row { grid-template-columns:repeat(3,1fr); }
+  }
+  @media (max-width: 480px) {
+    .topbar { padding:10px 12px 6px; }
+    .featured { min-height:220px; }
+    .hero-cta { gap:6px; }
+    .btn-play, .btn-ghost { padding:8px 12px; font-size:12px; }
+    .pill { display:none; }
+    .pill:nth-of-type(1) { display:inline-block; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ╰── Sidebar (LinearLayout vertical 78dp) ──╯ -->
+  <aside class="sidebar">
+    <div class="logo" title="SolPlay"><i class="ti ti-player-play-filled"></i></div>
+    <div class="spacer"></div>
+
+    <!-- bg_sidebar_btn — TV Live actif (orange + halo blanc) -->
+    <button class="side-btn live active" title="TV Live"><i class="ti ti-device-tv"></i></button>
+    <button class="side-btn" title="Films"><i class="ti ti-movie"></i></button>
+    <button class="side-btn" title="Séries"><i class="ti ti-layout-grid"></i></button>
+    <button class="side-btn" title="Compte"><i class="ti ti-user-circle"></i></button>
+    <div class="spacer"></div>
+    <button class="side-btn" title="Actualiser"><i class="ti ti-refresh"></i></button>
+  </aside>
+
+  <!-- ╰── Main column ──╯ -->
+  <section class="main">
+
+    <!-- ── Top bar (SOL blanc + PLAY orange) ── -->
+    <header class="topbar">
+      <div class="brand-mark"><i class="ti ti-player-play-filled"></i></div>
+      <div class="brand-name">SOL<span>PLAY</span></div>
+      <div class="status-block">
+        <div class="a">Logged in as : <b style="color:#ECEDF1;font-weight:600">Est 1h</b></div>
+        <div class="b">Expiration : <b style="color:#ECEDF1;font-weight:600">22/08/2026 à 14:00</b></div>
+      </div>
+      <button class="round-btn" title="Replay"><i class="ti ti-history"></i></button>
+      <button class="round-btn" title="Favoris"><i class="ti ti-star"></i></button>
+      <button class="round-btn" title="Playlist"><i class="ti ti-list"></i></button>
+    </header>
+
+    <!-- ── Hero row (55%) ── -->
+    <div class="hero-row">
+
+      <!-- Featured panel -->
+      <div class="featured">
+        <div class="backdrop"></div>
+        <div class="scrim"></div>
+        <div class="meta">
+          <div class="hero-badge">★ COUP DE CŒUR DU JOUR</div>
+          <h1 class="hero-title">Le Sang du Dragon</h1>
+          <div class="hero-meta-row">
+            <span class="item"><i class="ti ti-star-filled"></i> 9.2</span>
+            <span class="item dim"><i class="ti ti-clock"></i> 2h 18m</span>
+            <span class="item dim"><i class="ti ti-world"></i> VF / VOSTFR</span>
+            <span class="item dim"><i class="ti ti-flame"></i> HD · 4K</span>
+          </div>
+          <p class="hero-desc">Une saga épique aux confins d'un empire oublié. Suivez l'ascension d'un guerrier légendaire dans une production 2026 déjà saluée par la critique.</p>
+          <div class="hero-cta">
+            <button class="btn-play">▶ Lecture</button>
+            <button class="btn-ghost">+ Ma liste</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 categories cards -->
+      <div class="cats">
+        <div class="cat live">
+          <div>
+            <div class="label-tag">+ 12 000 CHAÎNES</div>
+            <h2>TV en direct</h2>
+            <p>Direct · Replay · EPG complet</p>
+          </div>
+          <div class="icon-pill"><i class="ti ti-broadcast"></i></div>
+        </div>
+        <div class="cat movie">
+          <div>
+            <div class="label-tag">+ 80 000 TITRES</div>
+            <h2>Films</h2>
+            <p>Nouveautés chaque semaine · 4K UHD</p>
+          </div>
+          <div class="icon-pill"><i class="ti ti-movie"></i></div>
+        </div>
+        <div class="cat serie">
+          <div>
+            <div class="label-tag">+ 25 000 SÉRIES</div>
+            <h2>Séries</h2>
+            <p>Saisons complètes · multi-langues</p>
+          </div>
+          <div class="icon-pill"><i class="ti ti-layout-grid"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Bottom row (40%) ── -->
+    <div class="bottom-row">
+      <div class="row-head">
+        <span class="row-title"><i class="ti ti-flame"></i> Le Sang du Dragon — Universe</span>
+        <span class="pill">UPDATE EPG</span>
+        <span class="pill">ACCOUNT</span>
+        <span class="pill">CATCH UP</span>
+      </div>
+      <div class="poster-row">
+        <div class="poster green"><div class="pic a"></div><span class="tag">S1</span><div class="name">Origines</div><div class="bar"></div></div>
+        <div class="poster green"><div class="pic d"></div><span class="tag">S2</span><div class="name">L'Ascension</div><div class="bar"></div></div>
+        <div class="poster violet"><div class="pic b"></div><span class="tag">FILM</span><div class="name">La Prophétie</div><div class="bar"></div></div>
+        <div class="poster green"><div class="pic e"></div><span class="tag">S3</span><div class="name">Le Retour</div><div class="bar"></div></div>
+        <div class="poster green"><div class="pic d"></div><span class="tag">BONUS</span><div class="name">Making-of</div><div class="bar"></div></div>
+        <div class="poster violet"><div class="pic f"></div><span class="tag">2026</span><div class="name">Conférence Live</div><div class="bar"></div></div>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>
