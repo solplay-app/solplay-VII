@@ -5,6 +5,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -68,6 +71,28 @@ class HomeActivity : AppCompatActivity() {
         binding.tileMovies.setOnClickListener { openChannels(ContentType.MOVIE) }
         binding.tileSeries.setOnClickListener { openChannels(ContentType.SERIES) }
 
+        // Catégories de la nouvelle maquette — même handlers que les tuiles
+        // latérales correspondantes, le clic utilisateur appuie sur l'une ou
+        // l'autre suivant le contexte (télécommande vs télécommande TV avec
+        // pad directionnel).
+        binding.cardLive?.setOnClickListener { openChannels(ContentType.LIVE) }
+        binding.cardMovies?.setOnClickListener { openChannels(ContentType.MOVIE) }
+        binding.cardSeries?.setOnClickListener { openChannels(ContentType.SERIES) }
+
+        // CTA du panneau vedette : "Lecture" lance le hero courant, "Ma liste"
+        // ajoute/retire le hero courant des favoris. Lecture délègue à la
+        // même logique que la rangée d'affiches si un hero est défini.
+        binding.btnHeroPlay?.setOnClickListener { playFeaturedIfAny() }
+        binding.btnHeroMyList?.setOnClickListener { toggleFeaturedFavorite() }
+
+        // Pilules vertes : UPDATE EPG → rafraîchissement manuel,
+        // ACCOUNT → écran "À propos", CATCH UP → raccourci replay.
+        binding.pillUpdateEpg?.setOnClickListener { refreshEpgAndChannels() }
+        binding.pillAccount?.setOnClickListener {
+            startActivity(Intent(this, AboutActivity::class.java))
+        }
+        binding.pillCatchUp?.setOnClickListener { openCatchupShortcut() }
+
         // Boutons secondaires visibles sur les maquettes.
         binding.tileChangeServer.setOnClickListener { refreshEpgAndChannels() }
         binding.tileFavorites.setOnClickListener {
@@ -110,6 +135,7 @@ class HomeActivity : AppCompatActivity() {
         showAccountInfo()
         refreshCacheInBackgroundIfStale()
         setupHomePosterRow()
+        setupFeaturedDefaults()
     }
 
     // ──────────────────────────────────────────────────────────
@@ -184,6 +210,47 @@ class HomeActivity : AppCompatActivity() {
         intent.putExtra(PlayerActivity.EXTRA_STREAM_URL, channel.streamUrl)
         intent.putExtra(PlayerActivity.EXTRA_STREAM_NAME, channel.name)
         startActivity(intent)
+    }
+
+    /**
+     * Boutons CTA du panneau vedette — branchés sur les mêmes données que la
+     * rangée d'affiches. Tant qu'aucune playlist n'est chargée (premier
+     * lancement, cache froid), on laisse juste un feedback utilisateur.
+     */
+    private fun playFeaturedIfAny() {
+        val firstMovie = ChannelRepository.channels
+            .firstOrNull { it.contentType() == ContentType.MOVIE }
+        if (firstMovie == null) {
+            Toast.makeText(this, "Aucune playlist chargée pour le moment.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        playFromHome(firstMovie)
+    }
+
+    private fun toggleFeaturedFavorite() {
+        val firstMovie = ChannelRepository.channels
+            .firstOrNull { it.contentType() == ContentType.MOVIE }
+        if (firstMovie == null) {
+            Toast.makeText(this, "Aucune entrée à ajouter.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val nowFav = FavoritesStore.toggle(this, firstMovie)
+        val msg = if (nowFav) "Ajouté à « Ma liste »" else "Retiré de « Ma liste »"
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * Renseigne les champs statiques du nouveau panneau vedette quand il n'y a
+     * pas encore de film TMDB résolu (placeholder plutôt qu'écran vide).
+     */
+    private fun setupFeaturedDefaults() {
+        binding.tvHeroBadge?.text = "★ COUP DE CŒUR DU JOUR"
+        binding.tvHeroDescription?.text = "Suggestions, replays et découvertes — votre prochaine séance n'attend que vous."
+        binding.tvHeroRating?.text = "9.2"
+        binding.tvHeroDuration?.text = "En direct"
+        binding.tvHeroLang?.text = "VF / VOSTFR"
+        binding.tvHeroQuality?.text = "HD · 4K"
+        binding.tvPosterSectionLabel?.text = "🔥 Sélection du jour — Top Films"
     }
 
     private fun showHomeParentalPinDialog(onGranted: () -> Unit) {
