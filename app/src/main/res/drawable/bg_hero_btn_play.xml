@@ -1,31 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Bouton principal orange du panneau vedette (Lecture). -->
+<!-- Bouton orange du panneau vedette (LECTURE). Texte en blanc (XML). -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <gradient
-                android:type="linear"
-                android:angle="135"
-                android:startColor="@color/solplay_orange"
-                android:endColor="#A34400" />
+            <gradient android:type="linear" android:angle="135"
+                android:startColor="@color/solplay_orange" android:endColor="#A34400" />
             <corners android:radius="10dp" />
-            <stroke android:width="2dp" android:color="@color/solplay_white" />
+            <stroke android:width="3dp" android:color="@color/solplay_white" />
         </shape>
     </item>
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
             <solid android:color="@color/solplay_orange_dark" />
             <corners android:radius="10dp" />
+            <stroke android:width="3dp" android:color="@color/solplay_orange" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
-            <gradient
-                android:type="linear"
-                android:angle="135"
-                android:startColor="@color/solplay_orange"
-                android:endColor="@color/solplay_orange_dark" />
+            <solid android:color="@color/solplay_orange" />
             <corners android:radius="10dp" />
+            <stroke android:width="2dp" android:color="#80FFFFFF" />
         </shape>
     </item>
 </selector>

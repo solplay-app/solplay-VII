@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- ItemPoster : une tuile affiche de la rangée d'accueil.
+     Cadre cyan fin permanent + halo orange au focus pour que le sélecteur
+     soit VISIBLE même hors focus (correction bug remonté). -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="168dp"
     android:layout_height="100dp"
@@ -14,7 +17,10 @@
         android:scaleType="centerCrop"
         android:background="#061B22"
         android:contentDescription="Affiche" />
-    <TextView android:id="@+id/tvChannelName" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-    <TextView android:id="@+id/tvChannelGroup" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-    <TextView android:id="@+id/tvProgramInfo" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <TextView android:id="@+id/tvChannelName" android:layout_width="1dp"
+        android:layout_height="1dp" android:visibility="gone" />
+    <TextView android:id="@+id/tvChannelGroup" android:layout_width="1dp"
+        android:layout_height="1dp" android:visibility="gone" />
+    <TextView android:id="@+id/tvProgramInfo" android:layout_width="1dp"
+        android:layout_height="1dp" android:visibility="gone" />
 </FrameLayout>

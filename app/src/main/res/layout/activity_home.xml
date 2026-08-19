@@ -6,83 +6,250 @@
     android:orientation="horizontal"
     android:background="@drawable/bg_home_screen">
 
+    <!-- Sidebar élargie (150dp) pour contenir l'icône ronde + le libellé
+         (LIVE / MOVIES / SERIES) sur une seule ligne, SANS débordement. -->
     <LinearLayout
         android:id="@+id/sidebar"
-        android:layout_width="106dp"
+        android:layout_width="150dp"
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:gravity="center_horizontal"
         android:paddingTop="14dp"
         android:paddingBottom="16dp"
         android:background="#B3000610">
-        <Space android:layout_width="1dp" android:layout_height="30dp" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
-            <ImageView android:id="@+id/tileLiveTv" android:layout_width="60dp" android:layout_height="60dp" android:padding="10dp" android:background="@drawable/bg_sidebar_btn" android:src="@drawable/ic_tile_live" android:clickable="true" android:focusable="true" android:contentDescription="Live" />
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="LIVE" android:textColor="@color/solplay_white" android:textStyle="bold" android:textSize="17sp" android:layout_marginStart="7dp" />
+
+        <Space android:layout_width="1dp" android:layout_height="22dp" />
+
+        <LinearLayout android:id="@+id/rowLive"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:gravity="center_vertical" android:orientation="horizontal"
+            android:focusable="true" android:clickable="true"
+            android:nextFocusDown="@id/rowMovies">
+            <ImageView android:id="@+id/tileLiveTv" android:layout_width="60dp" android:layout_height="60dp"
+                android:padding="10dp" android:background="@drawable/bg_sidebar_btn"
+                android:src="@drawable/ic_tile_live" android:focusable="true"
+                android:contentDescription="Live" android:duplicateParentState="true" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="LIVE" android:textColor="@color/solplay_white"
+                android:textStyle="bold" android:textSize="16sp"
+                android:layout_marginStart="8dp" android:duplicateParentState="true" />
         </LinearLayout>
+
         <Space android:layout_width="1dp" android:layout_height="14dp" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
-            <ImageView android:id="@+id/tileMovies" android:layout_width="60dp" android:layout_height="60dp" android:padding="10dp" android:background="@drawable/bg_sidebar_btn" android:src="@drawable/ic_tile_films" android:clickable="true" android:focusable="true" android:contentDescription="Movies" />
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="MOVIES" android:textColor="@color/solplay_white" android:textStyle="bold" android:textSize="15sp" android:layout_marginStart="7dp" />
+
+        <LinearLayout android:id="@+id/rowMovies"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:gravity="center_vertical" android:orientation="horizontal"
+            android:focusable="true" android:clickable="true"
+            android:nextFocusUp="@id/rowLive" android:nextFocusDown="@id/rowSeries">
+            <ImageView android:id="@+id/tileMovies" android:layout_width="60dp" android:layout_height="60dp"
+                android:padding="10dp" android:background="@drawable/bg_sidebar_btn"
+                android:src="@drawable/ic_tile_films" android:focusable="true"
+                android:contentDescription="Movies" android:duplicateParentState="true" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="MOVIES" android:textColor="@color/solplay_white"
+                android:textStyle="bold" android:textSize="15sp"
+                android:layout_marginStart="8dp" android:duplicateParentState="true" />
         </LinearLayout>
+
         <Space android:layout_width="1dp" android:layout_height="14dp" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
-            <ImageView android:id="@+id/tileSeries" android:layout_width="60dp" android:layout_height="60dp" android:padding="10dp" android:background="@drawable/bg_sidebar_btn" android:src="@drawable/ic_tile_series" android:clickable="true" android:focusable="true" android:contentDescription="Series" />
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SERIES" android:textColor="@color/solplay_white" android:textStyle="bold" android:textSize="15sp" android:layout_marginStart="7dp" />
+
+        <LinearLayout android:id="@+id/rowSeries"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:gravity="center_vertical" android:orientation="horizontal"
+            android:focusable="true" android:clickable="true"
+            android:nextFocusUp="@id/rowMovies" android:nextFocusDown="@id/rowAccount">
+            <ImageView android:id="@+id/tileSeries" android:layout_width="60dp" android:layout_height="60dp"
+                android:padding="10dp" android:background="@drawable/bg_sidebar_btn"
+                android:src="@drawable/ic_tile_series" android:focusable="true"
+                android:contentDescription="Series" android:duplicateParentState="true" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="SERIES" android:textColor="@color/solplay_white"
+                android:textStyle="bold" android:textSize="15sp"
+                android:layout_marginStart="8dp" android:duplicateParentState="true" />
         </LinearLayout>
+
         <Space android:layout_width="1dp" android:layout_height="14dp" />
-        <ImageView android:id="@+id/tileAccount" android:layout_width="60dp" android:layout_height="60dp" android:padding="11dp" android:background="@drawable/bg_sidebar_btn" android:src="@drawable/ic_tile_account" android:clickable="true" android:focusable="true" android:contentDescription="Compte" />
+
+        <LinearLayout android:id="@+id/rowAccount"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:gravity="center_vertical" android:orientation="horizontal"
+            android:focusable="true" android:clickable="true"
+            android:nextFocusUp="@id/rowSeries" android:nextFocusDown="@id/rowRefresh">
+            <ImageView android:id="@+id/tileAccount" android:layout_width="60dp" android:layout_height="60dp"
+                android:padding="11dp" android:background="@drawable/bg_sidebar_btn"
+                android:src="@drawable/ic_tile_account" android:focusable="false"
+                android:clickable="false" android:contentDescription="Compte"
+                android:duplicateParentState="true" />
+            <Space android:layout_width="8dp" android:layout_height="1dp" />
+        </LinearLayout>
+
         <Space android:layout_width="1dp" android:layout_height="0dp" android:layout_weight="1" />
-        <ImageView android:id="@+id/tileChangeServer" android:layout_width="60dp" android:layout_height="60dp" android:padding="11dp" android:background="@drawable/bg_sidebar_btn" android:src="@drawable/ic_tile_changeserver" android:clickable="true" android:focusable="true" android:contentDescription="Actualiser" />
+
+        <LinearLayout android:id="@+id/rowRefresh"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:gravity="center_vertical" android:orientation="horizontal"
+            android:focusable="true" android:clickable="true"
+            android:nextFocusUp="@id/rowAccount">
+            <ImageView android:id="@+id/tileChangeServer" android:layout_width="60dp" android:layout_height="60dp"
+                android:padding="11dp" android:background="@drawable/bg_sidebar_btn"
+                android:src="@drawable/ic_tile_changeserver" android:focusable="false"
+                android:clickable="false" android:contentDescription="Actualiser"
+                android:duplicateParentState="true" />
+            <Space android:layout_width="8dp" android:layout_height="1dp" />
+        </LinearLayout>
     </LinearLayout>
 
-    <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical">
-        <LinearLayout android:layout_width="match_parent" android:layout_height="72dp" android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="20dp" android:paddingEnd="20dp">
-            <ImageView android:layout_width="38dp" android:layout_height="38dp" android:src="@drawable/ic_solplay_logo" android:contentDescription="Logo" />
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SOL" android:textColor="@color/solplay_white" android:textStyle="bold" android:textSize="21sp" android:layout_marginStart="6dp" />
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PLAY" android:textColor="@color/solplay_orange" android:textStyle="bold" android:textSize="21sp" />
-            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="44dp">
-                <TextView android:id="@+id/tvConnectedAs" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="USER: TEST" android:textColor="@color/solplay_white_60" android:textSize="11sp" />
-                <TextView android:id="@+id/tvExpiration" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="EXPIRE: 11/09/2026" android:textColor="@color/solplay_white_60" android:textSize="11sp" />
+    <LinearLayout android:layout_width="0dp" android:layout_height="match_parent"
+        android:layout_weight="1" android:orientation="vertical">
+
+        <!-- Barre du haut : logo + USER / EXPIRE + icônes droite. -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="72dp"
+            android:orientation="horizontal" android:gravity="center_vertical"
+            android:paddingStart="20dp" android:paddingEnd="20dp">
+            <ImageView android:layout_width="38dp" android:layout_height="38dp"
+                android:src="@drawable/ic_solplay_logo" android:contentDescription="Logo" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="SOL" android:textColor="@color/solplay_white"
+                android:textStyle="bold" android:textSize="21sp"
+                android:layout_marginStart="6dp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="PLAY" android:textColor="@color/solplay_orange"
+                android:textStyle="bold" android:textSize="21sp" />
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:orientation="vertical"
+                android:layout_marginStart="44dp">
+                <TextView android:id="@+id/tvConnectedAs" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:text="USER: TEST"
+                    android:textColor="@color/solplay_white_60" android:textSize="11sp" />
+                <TextView android:id="@+id/tvExpiration" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:text="EXPIRE: 11/09/2026"
+                    android:textColor="@color/solplay_white_60" android:textSize="11sp" />
             </LinearLayout>
-            <ImageView android:id="@+id/tileHistory" android:layout_width="52dp" android:layout_height="52dp" android:padding="12dp" android:background="@drawable/bg_icon_circle" android:src="@drawable/ic_tile_replay" android:clickable="true" android:focusable="true" android:contentDescription="Historique" />
-            <ImageView android:id="@+id/tileFavorites" android:layout_width="52dp" android:layout_height="52dp" android:layout_marginStart="14dp" android:padding="12dp" android:background="@drawable/bg_icon_circle" android:src="@drawable/ic_tile_star" android:clickable="true" android:focusable="true" android:contentDescription="Favoris" />
-            <ImageView android:id="@+id/tileSettings" android:layout_width="52dp" android:layout_height="52dp" android:layout_marginStart="14dp" android:padding="12dp" android:background="@drawable/bg_icon_circle" android:src="@drawable/ic_tile_playlist" android:clickable="true" android:focusable="true" android:contentDescription="Menu" />
+            <ImageView android:id="@+id/tileHistory" android:layout_width="52dp" android:layout_height="52dp"
+                android:padding="12dp" android:background="@drawable/bg_icon_circle"
+                android:src="@drawable/ic_tile_replay" android:clickable="true"
+                android:focusable="true" android:contentDescription="Historique" />
+            <ImageView android:id="@+id/tileFavorites" android:layout_width="52dp" android:layout_height="52dp"
+                android:layout_marginStart="14dp" android:padding="12dp"
+                android:background="@drawable/bg_icon_circle" android:src="@drawable/ic_tile_star"
+                android:clickable="true" android:focusable="true" android:contentDescription="Favoris" />
+            <ImageView android:id="@+id/tileSettings" android:layout_width="52dp" android:layout_height="52dp"
+                android:layout_marginStart="14dp" android:padding="12dp"
+                android:background="@drawable/bg_icon_circle" android:src="@drawable/ic_tile_playlist"
+                android:clickable="true" android:focusable="true" android:contentDescription="Menu" />
         </LinearLayout>
 
-        <FrameLayout android:id="@+id/heroContainer" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginStart="18dp" android:layout_marginEnd="18dp" android:layout_marginTop="4dp" android:background="#050D16" android:clipToOutline="true">
-            <View android:id="@+id/heroBackdropTint" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#050D16" />
-            <ImageView android:id="@+id/ivHeroBackdrop" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerInside" android:background="#050D16" android:contentDescription="Miniature du film sélectionné" android:alpha="0" />
-            <ImageView android:id="@+id/ivHeroBackdropNext" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerInside" android:background="@android:color/transparent" android:contentDescription="" android:alpha="0" />
+        <!-- HERO : zone de la miniature rotative avec CROSSFADE. -->
+        <FrameLayout android:id="@+id/heroContainer"
+            android:layout_width="match_parent" android:layout_height="0dp"
+            android:layout_weight="0.95"
+            android:layout_marginStart="18dp" android:layout_marginEnd="18dp"
+            android:layout_marginTop="4dp"
+            android:background="#050D16" android:clipToOutline="true">
+            <View android:id="@+id/heroBackdropTint" android:layout_width="match_parent"
+                android:layout_height="match_parent" android:background="#050D16" />
+            <ImageView android:id="@+id/ivHeroBackdrop" android:layout_width="match_parent"
+                android:layout_height="match_parent" android:scaleType="centerCrop"
+                android:background="#050D16"
+                android:contentDescription="Miniature du film sélectionné"
+                android:alpha="99" />
+            <ImageView android:id="@+id/ivHeroBackdropNext" android:layout_width="match_parent"
+                android:layout_height="match_parent" android:scaleType="centerCrop"
+                android:background="@android:color/transparent"
+                android:contentDescription="" android:alpha="0" />
         </FrameLayout>
 
-        <LinearLayout android:layout_width="match_parent" android:layout_height="54dp" android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="60dp" android:paddingEnd="40dp">
-            <Button android:id="@+id/btnHeroPlay" android:layout_width="wrap_content" android:layout_height="42dp" android:background="@drawable/bg_hero_btn_play" android:text="LECTURE" android:textColor="@color/solplay_orange" android:textStyle="bold" android:textSize="14sp" android:paddingStart="24dp" android:paddingEnd="24dp" />
+        <!-- Ligne CTA : LECTURE + MA LISTE. -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="54dp"
+            android:orientation="horizontal" android:gravity="center_vertical"
+            android:paddingStart="60dp" android:paddingEnd="40dp">
+            <!-- Le libellé "LECTURE" était auparavant orange sur fond orange — illisible.
+                 On le force en blanc pour qu'il contraste nettement avec le bouton. -->
+            <Button android:id="@+id/btnHeroPlay" android:layout_width="wrap_content"
+                android:layout_height="42dp" android:background="@drawable/bg_hero_btn_play"
+                android:text="LECTURE" android:textColor="@color/solplay_white"
+                android:textStyle="bold" android:textSize="14sp"
+                android:paddingStart="24dp" android:paddingEnd="24dp" />
             <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
-            <Button android:id="@+id/btnHeroMyList" android:layout_width="wrap_content" android:layout_height="42dp" android:background="@drawable/bg_hero_btn_ghost" android:text="MA LISTE" android:textColor="#00F5FF" android:textStyle="bold" android:textSize="14sp" android:paddingStart="24dp" android:paddingEnd="24dp" />
+            <Button android:id="@+id/btnHeroMyList" android:layout_width="wrap_content"
+                android:layout_height="42dp" android:background="@drawable/bg_hero_btn_ghost"
+                android:text="MA LISTE" android:textColor="#00F5FF" android:textStyle="bold"
+                android:textSize="14sp" android:paddingStart="24dp" android:paddingEnd="24dp" />
         </LinearLayout>
 
-        <LinearLayout android:layout_width="match_parent" android:layout_height="42dp" android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="30dp">
-            <TextView android:id="@+id/tvPosterSectionLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🔥 SELECTION DU JOUR - TOP FILMS" android:textColor="@color/solplay_white" android:textStyle="bold" android:textSize="15sp" />
+        <!-- Titre de la section + libellé "MA LISTE" si besoin.
+             On garde LA SEULE rangée telle que la maquette la décrit :
+             "🔥 SELECTION DU JOUR - TOP FILMS" -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="38dp"
+            android:orientation="horizontal" android:gravity="center_vertical"
+            android:paddingStart="30dp">
+            <TextView android:id="@+id/tvPosterSectionLabel" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:text="🔥 SELECTION DU JOUR - TOP FILMS"
+                android:textColor="@color/solplay_white" android:textStyle="bold"
+                android:textSize="15sp" />
         </LinearLayout>
 
-        <androidx.recyclerview.widget.RecyclerView android:id="@+id/recyclerHomePosters" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="0.42" android:clipToPadding="false" android:paddingStart="34dp" android:paddingEnd="34dp" android:paddingBottom="12dp" />
+        <!--
+            ===========================================================
+            DEUX RANGÉES DE TUILES (conforme à la maquette) :
+            - rowHomePostersTop  : carrousel 1 (Films)
+            - rowHomePostersBot  : carrousel 2 (Séries)
+            Chacune fait ~150dp de haut, ce qui donne 4 colonnes par rangée
+            (GridLayoutManager span=4). 5 colonnes étaient tronquées sur TV.
+            ===========================================================
+        -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerHomePostersTop"
+            android:layout_width="match_parent" android:layout_height="0dp"
+            android:layout_weight="0.55"
+            android:clipToPadding="false"
+            android:paddingStart="34dp" android:paddingEnd="34dp"
+            android:paddingBottom="4dp" />
 
-        <!-- Kept in the binding for existing actions; not visible in the reference composition. -->
-        <LinearLayout android:id="@+id/cardLive" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <LinearLayout android:id="@+id/cardMovies" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <LinearLayout android:id="@+id/cardSeries" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <TextView android:id="@+id/pillUpdateEpg" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <TextView android:id="@+id/pillAccount" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <TextView android:id="@+id/pillCatchUp" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <LinearLayout android:id="@+id/tileResume" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone"><TextView android:id="@+id/tvResumeLabel" android:layout_width="1dp" android:layout_height="1dp" /></LinearLayout>
-        <TextView android:id="@+id/tvHeroBadge" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <TextView android:id="@+id/tvHeroTitle" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <TextView android:id="@+id/tvHeroRating" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <TextView android:id="@+id/tvHeroDuration" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <TextView android:id="@+id/tvHeroLang" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <TextView android:id="@+id/tvHeroQuality" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <TextView android:id="@+id/tvHeroDescription" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
-        <TextView android:id="@+id/tvClock" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerHomePostersBot"
+            android:layout_width="match_parent" android:layout_height="0dp"
+            android:layout_weight="0.55"
+            android:clipToPadding="false"
+            android:paddingStart="34dp" android:paddingEnd="34dp"
+            android:paddingBottom="12dp" />
+
+        <!-- Anciens IDs conservés (1dp / gone) pour ne pas casser le binding code généré. -->
+        <androidx.recyclerview.widget.RecyclerView android:id="@+id/recyclerHomePosters"
+            android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+        <LinearLayout android:id="@+id/cardLive" android:layout_width="1dp"
+            android:layout_height="1dp" android:visibility="gone" />
+        <LinearLayout android:id="@+id/cardMovies" android:layout_width="1dp"
+            android:layout_height="1dp" android:visibility="gone" />
+        <LinearLayout android:id="@+id/cardSeries" android:layout_width="1dp"
+            android:layout_height="1dp" android:visibility="gone" />
+        <TextView android:id="@+id/pillUpdateEpg" android:layout_width="1dp"
+            android:layout_height="1dp" android:visibility="gone" />
+        <TextView android:id="@+id/pillAccount" android:layout_width="1dp"
+            android:layout_height="1dp" android:visibility="gone" />
+        <TextView android:id="@+id/pillCatchUp" android:layout_width="1dp"
+            android:layout_height="1dp" android:visibility="gone" />
+        <LinearLayout android:id="@+id/tileResume" android:layout_width="1dp"
+            android:layout_height="1dp" android:visibility="gone">
+            <TextView android:id="@+id/tvResumeLabel" android:layout_width="1dp"
+                android:layout_height="1dp" />
+        </LinearLayout>
+        <TextView android:id="@+id/tvHeroBadge" android:layout_width="1dp"
+            android:layout_height="1dp" android:visibility="gone" />
+        <TextView android:id="@+id/tvHeroTitle" android:layout_width="1dp"
+            android:layout_height="1dp" android:visibility="gone" />
+        <TextView android:id="@+id/tvHeroRating" android:layout_width="1dp"
+            android:layout_height="1dp" android:visibility="gone" />
+        <TextView android:id="@+id/tvHeroDuration" android:layout_width="1dp"
+            android:layout_height="1dp" android:visibility="gone" />
+        <TextView android:id="@+id/tvHeroLang" android:layout_width="1dp"
+            android:layout_height="1dp" android:visibility="gone" />
+        <TextView android:id="@+id/tvHeroQuality" android:layout_width="1dp"
+            android:layout_height="1dp" android:visibility="gone" />
+        <TextView android:id="@+id/tvHeroDescription" android:layout_width="1dp"
+            android:layout_height="1dp" android:visibility="gone" />
+        <TextView android:id="@+id/tvClock" android:layout_width="1dp"
+            android:layout_height="1dp" android:visibility="gone" />
     </LinearLayout>
 </LinearLayout>

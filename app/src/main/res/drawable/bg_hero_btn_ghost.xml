@@ -1,24 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Bouton secondaire translucide du panneau vedette (Ma liste). -->
+<!-- Bouton secondaire translucide du panneau vedette (MA LISTE). -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <solid android:color="#55FFFFFF" />
+            <solid android:color="#9900F5FF" />
             <corners android:radius="10dp" />
-            <stroke android:width="2dp" android:color="@color/solplay_white" />
+            <stroke android:width="3dp" android:color="@color/solplay_white" />
         </shape>
     </item>
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <solid android:color="#33FFFFFF" />
+            <solid android:color="#5500F5FF" />
             <corners android:radius="10dp" />
+            <stroke android:width="3dp" android:color="#00F5FF" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="#1100F5FF" />
+            <solid android:color="#2200F5FF" />
             <corners android:radius="10dp" />
-            <stroke android:width="1dp" android:color="#AA00F5FF" />
+            <stroke android:width="2dp" android:color="#FF00F5FF" />
         </shape>
     </item>
 </selector>
