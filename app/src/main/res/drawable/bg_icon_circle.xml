@@ -6,18 +6,18 @@
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
         <shape android:shape="oval">
-            <solid android:color="@color/solplay_orange" />
+            <solid android:color="#00F5FF" />
             <stroke android:width="2dp" android:color="@color/solplay_white" />
         </shape>
     </item>
     <item android:state_pressed="true">
         <shape android:shape="oval">
-            <solid android:color="@color/solplay_orange_dark" />
+            <solid android:color="#00F5FF_dark" />
         </shape>
     </item>
     <item>
         <shape android:shape="oval">
-            <solid android:color="#33FFFFFF" />
+            <solid android:color="#2200F5FF" />
         </shape>
     </item>
 </selector>

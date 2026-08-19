@@ -143,6 +143,27 @@
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
         android:text="Copier la cle appareil" />
 
+    <!-- QR code de la clé appareil : visible dès l'écran d'ouverture pour que
+         l'admin puisse scanner la clé sans que l'utilisateur ait besoin de se
+         connecter d'abord. Généré dans LicenseActivity.onCreate. -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:text="Scannez ce QR code avec votre téléphone pour envoyer votre clé au revendeur :"
+        android:textColor="@color/solplay_text_secondary"
+        android:textSize="13sp" />
+
+    <ImageView
+        android:id="@+id/ivDeviceKeyQr"
+        android:layout_width="220dp"
+        android:layout_height="220dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:contentDescription="QR code de la clé appareil"
+        android:visibility="gone" />
+
     <Button
         android:id="@+id/btnVerifyActivation"
         android:layout_width="match_parent"
