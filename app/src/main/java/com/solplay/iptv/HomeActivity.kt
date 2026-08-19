@@ -15,7 +15,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import com.solplay.iptv.databinding.ActivityHomeBinding
@@ -26,27 +26,18 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Écran d'accueil principal SOLPLAY.
- *
- * - En portrait : présentation type smartphone, fidèle à la maquette fournie.
- * - En paysage : présentation type TV / box Android, fidèle à la maquette fournie.
- */
 class HomeActivity : AppCompatActivity() {
 
     companion object {
-        /** Au-delà de cette ancienneté, le cache est rafraîchi en arrière-plan à l'ouverture.
-         *  CORRECTIF (URL périmées) : abaissé de 30 min à 10 min pour renouveler
-         *  plus souvent les liens de flux (les tokens Xtream/M3U expirent vite) et
-         *  éviter de repartir sur des URL mortes après un redémarrage. */
-        private const val CACHE_REFRESH_THRESHOLD_MS = 10 * 60 * 1000L // 10 min
+        private const val CACHE_REFRESH_THRESHOLD_MS = 10 * 60 * 1000L
     }
 
     private lateinit var binding: ActivityHomeBinding
     private val clockHandler = Handler(Looper.getMainLooper())
     private val clockFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
     private val heroHandler = Handler(Looper.getMainLooper())
-    private val heroSwapDuration = 250L
+    /** Durée du CROSSFADE entre miniatures (hero) — fondu fluide */
+    private val heroSwapDuration = 600L
     private val heroInterval = 5_000L
     private val heroResumeDelay = 10_000L
     private var heroItems: List<Pair<Channel, String>> = emptyList()
@@ -54,10 +45,18 @@ class HomeActivity : AppCompatActivity() {
     private var heroPaused = false
     private var heroSwapPending = false
     private var heroShowingNext = false
-    private val heroRotation = object : Runnable { override fun run() { if (!heroPaused) showNextHero(); heroHandler.postDelayed(this, heroInterval) } }
-    private val heroResume = Runnable { heroPaused = false; heroHandler.removeCallbacks(heroRotation); heroHandler.postDelayed(heroRotation, heroInterval) }
+    private val heroRotation = object : Runnable {
+        override fun run() {
+            if (!heroPaused) showNextHero()
+            heroHandler.postDelayed(this, heroInterval)
+        }
+    }
+    private val heroResume = Runnable {
+        heroPaused = false
+        heroHandler.removeCallbacks(heroRotation)
+        heroHandler.postDelayed(heroRotation, heroInterval)
+    }
 
-    /** Remet l'horloge de la barre du haut à jour toutes les minutes tant que l'écran est visible. */
     private val clockRunnable = object : Runnable {
         override fun run() {
             binding.tvClock.text = clockFormat.format(Date())
@@ -89,46 +88,35 @@ class HomeActivity : AppCompatActivity() {
         binding = ActivityHomeBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Sidebar (rangées complètes icône+libellé).
+        binding.rowLive.setOnClickListener { openChannels(ContentType.LIVE) }
+        binding.rowMovies.setOnClickListener { openChannels(ContentType.MOVIE) }
+        binding.rowSeries.setOnClickListener { openChannels(ContentType.SERIES) }
+        binding.rowAccount.setOnClickListener {
+            startActivity(Intent(this, AboutActivity::class.java))
+        }
+        binding.rowRefresh.setOnClickListener { refreshEpgAndChannels() }
+        // Filets de sécurité : clic direct sur l'icône interne.
         binding.tileLiveTv.setOnClickListener { openChannels(ContentType.LIVE) }
         binding.tileMovies.setOnClickListener { openChannels(ContentType.MOVIE) }
         binding.tileSeries.setOnClickListener { openChannels(ContentType.SERIES) }
 
-        // Catégories de la nouvelle maquette — même handlers que les tuiles
-        // latérales correspondantes, le clic utilisateur appuie sur l'une ou
-        // l'autre suivant le contexte (télécommande vs télécommande TV avec
-        // pad directionnel).
-        binding.cardLive?.setOnClickListener { openChannels(ContentType.LIVE) }
-        binding.cardMovies?.setOnClickListener { openChannels(ContentType.MOVIE) }
-        binding.cardSeries?.setOnClickListener { openChannels(ContentType.SERIES) }
-
-        // CTA du panneau vedette : "Lecture" lance le hero courant, "Ma liste"
-        // ajoute/retire le hero courant des favoris. Lecture délègue à la
-        // même logique que la rangée d'affiches si un hero est défini.
-
-        // Pilules vertes : UPDATE EPG → rafraîchissement manuel,
-        // ACCOUNT → écran "À propos", CATCH UP → raccourci replay.
+        // Pilules CTA du panneau vedette.
         binding.pillUpdateEpg?.setOnClickListener { refreshEpgAndChannels() }
         binding.pillAccount?.setOnClickListener {
             startActivity(Intent(this, AboutActivity::class.java))
         }
         binding.pillCatchUp?.setOnClickListener { openCatchupShortcut() }
 
-        // Boutons secondaires visibles sur les maquettes.
-        binding.tileChangeServer.setOnClickListener { refreshEpgAndChannels() }
+        // Icônes en haut à droite.
         binding.tileFavorites.setOnClickListener {
             startActivity(Intent(this, FavoritesActivity::class.java))
         }
         binding.tileHistory.setOnClickListener { openCatchupShortcut() }
-
-        // Icônes TV en haut à droite.
-        binding.tileAccount.setOnClickListener {
-            startActivity(Intent(this, AboutActivity::class.java))
-        }
         binding.tileSettings.setOnClickListener {
             startActivity(Intent(this, PlaylistsListActivity::class.java))
         }
 
-        // Tuile Reprendre (optionnelle, hors maquette mais utile si présente).
         val resume = ResumeStore.get(this)
         if (resume != null) {
             binding.tileResume.visibility = View.VISIBLE
@@ -154,7 +142,7 @@ class HomeActivity : AppCompatActivity() {
 
         showAccountInfo()
         refreshCacheInBackgroundIfStale()
-        setupHomePosterRow()
+        setupHomePosterRows()
         setupFeaturedDefaults()
         binding.heroContainer.setOnTouchListener { _, event ->
             if (event.action == MotionEvent.ACTION_DOWN) pauseHeroRotation(true)
@@ -164,28 +152,55 @@ class HomeActivity : AppCompatActivity() {
         binding.btnHeroMyList?.setOnClickListener { pauseHeroRotation(true); toggleFeaturedFavorite() }
     }
 
-    // ──────────────────────────────────────────────────────────
-    // Bannière héro + rangée d'affiches (Films) de l'écran d'accueil
-    // ──────────────────────────────────────────────────────────
+    /** Limite par rangée : 4 colonnes × 2 lignes = 8 tuiles max par rangée (conforme maquette). */
+    private val homeRowLimit = 16
 
-    /** Nombre d'affiches chargées dans la rangée d'accueil (au-delà, l'utilisateur passe par "Films"). */
-    private val homeRowLimit = 25
+    private var homePosterAdapterTop: ChannelAdapter? = null
+    private var homePosterAdapterBot: ChannelAdapter? = null
 
-    private var homePosterAdapter: ChannelAdapter? = null
+    /**
+     * Configure les DEUX rangées d'affiches :
+     *  - Rangée 1 (TOP) : Films
+     *  - Rangée 2 (BOT) : Séries
+     * Chacune utilise un GridLayoutManager horizontal à 4 colonnes.
+     * Le sélecteur par défaut (1ère tuile sélectionnée) rend le sélecteur visible dès l'ouverture.
+     */
+    private fun setupHomePosterRows() {
+        val movies = ChannelRepository.channels
+            .filter { it.contentType() == ContentType.MOVIE }.take(homeRowLimit)
+        val series = ChannelRepository.channels
+            .filter { it.contentType() == ContentType.SERIES }.take(homeRowLimit)
 
-    private fun setupHomePosterRow() {
-        val movies = ChannelRepository.channels.filter { it.contentType() == ContentType.MOVIE }.take(homeRowLimit)
-        if (movies.isEmpty()) {
-            binding.tvPosterSectionLabel?.visibility = View.GONE
-            binding.recyclerHomePosters?.visibility = View.GONE
-            return
+        // Rangée 1 : FILMS.
+        if (movies.isNotEmpty()) {
+            binding.tvPosterSectionLabel.visibility = View.VISIBLE
+            binding.recyclerHomePostersTop.visibility = View.VISIBLE
+            val gridMovies = GridLayoutManager(this, 4, RecyclerView.HORIZONTAL, false)
+            binding.recyclerHomePostersTop.layoutManager = gridMovies
+            val adapterMovies = ChannelAdapter(movies, itemLayoutRes = R.layout.item_home_poster) { ch -> playFromHome(ch) }
+            homePosterAdapterTop = adapterMovies
+            binding.recyclerHomePostersTop.adapter = adapterMovies
+            // Focus initial sur la 1ère tuile du 1er groupe : sélecteur visible.
+            binding.recyclerHomePostersTop.post {
+                binding.recyclerHomePostersTop.findViewHolderForLayoutPosition(0)?.itemView?.requestFocus()
+            }
+        } else {
+            binding.recyclerHomePostersTop.visibility = View.GONE
         }
-        binding.tvPosterSectionLabel?.visibility = View.VISIBLE
-        binding.recyclerHomePosters?.visibility = View.VISIBLE
-        binding.recyclerHomePosters?.layoutManager = LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
-        val adapter = ChannelAdapter(movies, itemLayoutRes = R.layout.item_home_poster) { channel -> playFromHome(channel) }
-        homePosterAdapter = adapter
-        binding.recyclerHomePosters?.adapter = adapter
+
+        // Rangée 2 : SERIES.
+        if (series.isNotEmpty()) {
+            binding.recyclerHomePostersBot.visibility = View.VISIBLE
+            val gridSeries = GridLayoutManager(this, 4, RecyclerView.HORIZONTAL, false)
+            binding.recyclerHomePostersBot.layoutManager = gridSeries
+            val adapterSeries = ChannelAdapter(series, itemLayoutRes = R.layout.item_home_poster) { ch -> playFromHome(ch) }
+            homePosterAdapterBot = adapterSeries
+            binding.recyclerHomePostersBot.adapter = adapterSeries
+        } else {
+            binding.recyclerHomePostersBot.visibility = View.GONE
+        }
+
+        // Le hero (miniature rotative du haut) utilise les FILMS.
         lifecycleScope.launch {
             val resolved = movies.mapNotNull { channel ->
                 val url = channel.logoUrl?.takeIf { it.isNotBlank() } ?: run {
@@ -204,26 +219,52 @@ class HomeActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupHeroBanner(channel: Channel) { }
-
+    /**
+     * CROSSFADE fluide entre miniatures hérö :
+     * - Utilise deux ImageView (current + next) empilés.
+     * - Télécharge la prochaine miniature en alpha=0, puis anime les deux
+     *   vers leur cible respective sur heroSwapDuration (600 ms).
+     * - Pas de placeholder qui resterait figé : on anime la nouvelle image
+     *   immédiatement à l'arrivée du bitmap.
+     */
     private fun showHeroImage(url: String, first: Boolean = false) {
         if (heroSwapPending) return
         heroSwapPending = true
         val incoming = if (heroShowingNext) binding.ivHeroBackdrop else binding.ivHeroBackdropNext
         val outgoing = if (heroShowingNext) binding.ivHeroBackdropNext else binding.ivHeroBackdrop
+
+        // Prépare la cible : invisible jusqu'au chargement.
         incoming.alpha = 0f
         incoming.load(url, ImageLoader.get(this)) {
             placeholder(null)
             error(null)
-            listener(onSuccess = { _, result ->
-                heroSwapPending = false
-                val bitmap = (result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
-                if (bitmap != null) updateHeroBackground(bitmap)
-                incoming.animate().alpha(1f).setDuration(if (first) heroSwapDuration else heroSwapDuration).setInterpolator(android.view.animation.DecelerateInterpolator()).start()
-                if (!first) outgoing.animate().alpha(0f).setDuration(heroSwapDuration).start()
-                else outgoing.alpha = 0f
-                heroShowingNext = !heroShowingNext
-            }, onError = { _, _ -> heroSwapPending = false })
+            listener(
+                onSuccess = { _, result ->
+                    heroSwapPending = false
+                    val bitmap = (result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                    if (bitmap != null) updateHeroBackground(bitmap)
+                    // CROSSFADE : entrée vers 1.f (durée 600ms) + sortie de l'ancien vers 0.f.
+                    incoming.animate()
+                        .alpha(1f)
+                        .setDuration(heroSwapDuration)
+                        .setInterpolator(android.view.animation.DecelerateInterpolator())
+                        .start()
+                    if (!first) {
+                        outgoing.animate()
+                            .alpha(0f)
+                            .setDuration(heroSwapDuration)
+                            .setInterpolator(android.view.animation.AccelerateInterpolator())
+                            .start()
+                    } else {
+                        outgoing.alpha = 0f
+                    }
+                    heroShowingNext = !heroShowingNext
+                },
+                onError = { _, _ ->
+                    heroSwapPending = false
+                    incoming.alpha = if (first) 1f else 0f
+                }
+            )
         }
     }
 
@@ -231,8 +272,15 @@ class HomeActivity : AppCompatActivity() {
         val sample = Bitmap.createScaledBitmap(bitmap, 1, 1, true)
         val c = sample.getPixel(0, 0)
         sample.recycle()
-        val dark = Color.rgb((Color.red(c) * .20f).toInt(), (Color.green(c) * .20f).toInt(), (Color.blue(c) * .20f).toInt())
-        val drawable = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(2, 7, 13), dark, Color.rgb(1, 3, 7)))
+        val dark = Color.rgb(
+            (Color.red(c) * .20f).toInt(),
+            (Color.green(c) * .20f).toInt(),
+            (Color.blue(c) * .20f).toInt()
+        )
+        val drawable = GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            intArrayOf(Color.rgb(2, 7, 13), dark, Color.rgb(1, 3, 7))
+        )
         binding.heroBackdropTint.background = drawable
         binding.heroBackdropTint.animate().alpha(1f).setDuration(450L).start()
     }
@@ -257,24 +305,20 @@ class HomeActivity : AppCompatActivity() {
         if (heroItems.size > 1) heroHandler.postDelayed(heroRotation, heroInterval)
     }
 
-    /** Lance la lecture d'un film choisi directement depuis la rangée d'accueil. */
     private fun playFromHome(channel: Channel) {
         if (ParentalControl.isAdultChannel(channel) && !ParentalControl.isUnlocked()) {
             showHomeParentalPinDialog { playFromHome(channel) }
             return
         }
-        ChannelRepository.setPlayingList(homePosterAdapter?.currentList() ?: listOf(channel))
+        val all = homePosterAdapterTop?.currentList().orEmpty() +
+            homePosterAdapterBot?.currentList().orEmpty()
+        ChannelRepository.setPlayingList(all.ifEmpty { listOf(channel) })
         val intent = Intent(this, PlayerActivity::class.java)
         intent.putExtra(PlayerActivity.EXTRA_STREAM_URL, channel.streamUrl)
         intent.putExtra(PlayerActivity.EXTRA_STREAM_NAME, channel.name)
         startActivity(intent)
     }
 
-    /**
-     * Boutons CTA du panneau vedette — branchés sur les mêmes données que la
-     * rangée d'affiches. Tant qu'aucune playlist n'est chargée (premier
-     * lancement, cache froid), on laisse juste un feedback utilisateur.
-     */
     private fun playFeaturedIfAny() {
         val firstMovie = ChannelRepository.channels
             .firstOrNull { it.contentType() == ContentType.MOVIE }
@@ -297,17 +341,14 @@ class HomeActivity : AppCompatActivity() {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
     }
 
-    /**
-     * Renseigne les champs statiques du nouveau panneau vedette quand il n'y a
-     * pas encore de film TMDB résolu (placeholder plutôt qu'écran vide).
-     */
     private fun setupFeaturedDefaults() {
-        binding.tvPosterSectionLabel?.text = "🔥 SELECTION DU JOUR - TOP FILMS"
+        binding.tvPosterSectionLabel.text = "🔥 SELECTION DU JOUR - TOP FILMS"
     }
 
     private fun showHomeParentalPinDialog(onGranted: () -> Unit) {
         val input = android.widget.EditText(this).apply {
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or
+                android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
             hint = "Code parental (4 chiffres)"
             filters = arrayOf(android.text.InputFilter.LengthFilter(4))
         }
@@ -332,14 +373,9 @@ class HomeActivity : AppCompatActivity() {
         startActivity(intent)
     }
 
-    /**
-     * Raccourci "Catch Up" : l'utilisateur ouvre directement la section Live,
-     * puis pourra lancer le replay depuis le lecteur si son fournisseur le propose.
-     */
     private fun openCatchupShortcut() {
         val activeId = PlaylistStore.getActiveId(this) ?: return
         val playlist = PlaylistStore.getAll(this).firstOrNull { it.id == activeId } ?: return
-
         if (playlist.extractXtreamCredentials() == null) {
             Toast.makeText(
                 this,
@@ -348,7 +384,6 @@ class HomeActivity : AppCompatActivity() {
             ).show()
             return
         }
-
         Toast.makeText(
             this,
             "Choisissez une chaîne LIVE puis utilisez Catch Up dans le lecteur.",
@@ -357,17 +392,13 @@ class HomeActivity : AppCompatActivity() {
         openChannels(ContentType.LIVE)
     }
 
-    /** Actualisation manuelle des chaînes / catégories / EPG. */
     private fun refreshEpgAndChannels() {
         val activeId = PlaylistStore.getActiveId(this) ?: return
         val playlist = PlaylistStore.getAll(this).firstOrNull { it.id == activeId } ?: return
-
         Toast.makeText(this, "Actualisation EPG en cours…", Toast.LENGTH_SHORT).show()
-
         lifecycleScope.launch {
             val refreshed = ChannelRefresher.refresh(this@HomeActivity, playlist)
             if (isFinishing) return@launch
-
             if (refreshed.isNullOrEmpty()) {
                 Toast.makeText(
                     this@HomeActivity,
@@ -375,24 +406,15 @@ class HomeActivity : AppCompatActivity() {
                     Toast.LENGTH_LONG
                 ).show()
             } else {
-                Toast.makeText(
-                    this@HomeActivity,
-                    "Mise à jour terminée.",
-                    Toast.LENGTH_SHORT
-                ).show()
+                Toast.makeText(this@HomeActivity, "Mise à jour terminée.", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
-    /**
-     * Affiche les informations visibles en bas de l'écran comme sur la maquette.
-     */
     private fun showAccountInfo() {
         val activeId = PlaylistStore.getActiveId(this) ?: return
         val playlist = PlaylistStore.getAll(this).firstOrNull { it.id == activeId } ?: return
-
         binding.tvConnectedAs.text = "USER: ${playlist.name}"
-
         lifecycleScope.launch {
             val status = XtreamApiClient.checkAccountStatus(playlist) ?: return@launch
             val expiresAt = status.expiresAtMillis ?: return@launch
@@ -401,19 +423,15 @@ class HomeActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Rafraîchit silencieusement la playlist active en arrière-plan si le cache
-     * commence à dater.
-     */
     private fun refreshCacheInBackgroundIfStale() {
         lifecycleScope.launch {
             val activeId = PlaylistStore.getActiveId(this@HomeActivity) ?: return@launch
             val playlist = PlaylistStore.getAll(this@HomeActivity).firstOrNull { it.id == activeId } ?: return@launch
             if (ChannelCacheStore.ageMillis(this@HomeActivity, playlist.id) < CACHE_REFRESH_THRESHOLD_MS) return@launch
-
             ChannelRefresher.refresh(this@HomeActivity, playlist)
         }
     }
+
     override fun onDestroy() {
         heroHandler.removeCallbacksAndMessages(null)
         clockHandler.removeCallbacksAndMessages(null)
