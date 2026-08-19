@@ -20,9 +20,15 @@
 
         <Space android:layout_width="1dp" android:layout_height="22dp" />
 
+        <!-- Toutes les rangées ci-dessous utilisent désormais layout_width="match_parent"
+             + paddingStart identique (20dp) : les icônes démarrent toutes exactement
+             au même x, qu'il y ait un libellé à côté (LIVE/MOVIES/SERIES) ou non
+             (compte/actualiser). Avant, chaque rangée était en wrap_content et se
+             centrait indépendamment dans la sidebar → icônes désalignées. -->
         <LinearLayout android:id="@+id/rowLive"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
             android:gravity="center_vertical" android:orientation="horizontal"
+            android:paddingStart="20dp"
             android:focusable="true" android:clickable="true"
             android:nextFocusDown="@id/rowMovies">
             <ImageView android:id="@+id/tileLiveTv" android:layout_width="60dp" android:layout_height="60dp"
@@ -38,8 +44,9 @@
         <Space android:layout_width="1dp" android:layout_height="14dp" />
 
         <LinearLayout android:id="@+id/rowMovies"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
             android:gravity="center_vertical" android:orientation="horizontal"
+            android:paddingStart="20dp"
             android:focusable="true" android:clickable="true"
             android:nextFocusUp="@id/rowLive" android:nextFocusDown="@id/rowSeries">
             <ImageView android:id="@+id/tileMovies" android:layout_width="60dp" android:layout_height="60dp"
@@ -55,8 +62,9 @@
         <Space android:layout_width="1dp" android:layout_height="14dp" />
 
         <LinearLayout android:id="@+id/rowSeries"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
             android:gravity="center_vertical" android:orientation="horizontal"
+            android:paddingStart="20dp"
             android:focusable="true" android:clickable="true"
             android:nextFocusUp="@id/rowMovies" android:nextFocusDown="@id/rowAccount">
             <ImageView android:id="@+id/tileSeries" android:layout_width="60dp" android:layout_height="60dp"
@@ -72,12 +80,13 @@
         <Space android:layout_width="1dp" android:layout_height="14dp" />
 
         <LinearLayout android:id="@+id/rowAccount"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
             android:gravity="center_vertical" android:orientation="horizontal"
+            android:paddingStart="20dp"
             android:focusable="true" android:clickable="true"
             android:nextFocusUp="@id/rowSeries" android:nextFocusDown="@id/rowRefresh">
             <ImageView android:id="@+id/tileAccount" android:layout_width="60dp" android:layout_height="60dp"
-                android:padding="11dp" android:background="@drawable/bg_sidebar_btn"
+                android:padding="10dp" android:background="@drawable/bg_sidebar_btn"
                 android:src="@drawable/ic_tile_account" android:focusable="false"
                 android:clickable="false" android:contentDescription="Compte"
                 android:duplicateParentState="true" />
@@ -87,12 +96,13 @@
         <Space android:layout_width="1dp" android:layout_height="0dp" android:layout_weight="1" />
 
         <LinearLayout android:id="@+id/rowRefresh"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
             android:gravity="center_vertical" android:orientation="horizontal"
+            android:paddingStart="20dp"
             android:focusable="true" android:clickable="true"
             android:nextFocusUp="@id/rowAccount">
             <ImageView android:id="@+id/tileChangeServer" android:layout_width="60dp" android:layout_height="60dp"
-                android:padding="11dp" android:background="@drawable/bg_sidebar_btn"
+                android:padding="10dp" android:background="@drawable/bg_sidebar_btn"
                 android:src="@drawable/ic_tile_changeserver" android:focusable="false"
                 android:clickable="false" android:contentDescription="Actualiser"
                 android:duplicateParentState="true" />
@@ -140,10 +150,17 @@
                 android:clickable="true" android:focusable="true" android:contentDescription="Menu" />
         </LinearLayout>
 
-        <!-- HERO : zone de la miniature rotative avec CROSSFADE. -->
+        <!-- HERO : zone de la miniature rotative avec CROSSFADE.
+             layout_weight="1" (flexible) : le hero prend TOUT l'espace vertical
+             restant une fois les blocs à hauteur fixe déduits (barre du haut,
+             CTA, titre de section, et la rangée de tuiles ci-dessous qui a,
+             elle, une hauteur FIXE garantie — voir recyclerHomePostersTop).
+             Ce découpage évite tout risque de chevauchement entre le hero et
+             les tuiles, quelle que soit la hauteur d'écran réelle. -->
         <FrameLayout android:id="@+id/heroContainer"
             android:layout_width="match_parent" android:layout_height="0dp"
-            android:layout_weight="0.65"
+            android:layout_weight="1"
+            android:minHeight="120dp"
             android:layout_marginStart="18dp" android:layout_marginEnd="18dp"
             android:layout_marginTop="4dp"
             android:background="@drawable/bg_hero_placeholder" android:clipToOutline="true">
@@ -197,28 +214,40 @@
 
         <!--
             ===========================================================
-            DEUX RANGÉES DE TUILES (conforme à la maquette) :
-            - rowHomePostersTop  : carrousel 1 (Films)
-            - rowHomePostersBot  : carrousel 2 (Séries)
-            Chacune fait ~150dp de haut, ce qui donne 4 colonnes par rangée
-            (GridLayoutManager span=4). 5 colonnes étaient tronquées sur TV.
+            UNE SEULE SECTION DE TUILES sur l'écran d'accueil (Films),
+            conforme à la maquette : plus de rangée Séries ici (les séries
+            restent accessibles via le menu latéral SERIES).
+            recyclerHomePostersTop utilise un GridLayoutManager span=2 →
+            2 rangées de tuiles au total, comme demandé.
+
+            HAUTEUR FIXE (au lieu d'un layout_weight) : c'est la garantie
+            anti-chevauchement. Chaque tuile fait 100dp + 10dp de marge basse
+            (item_home_poster.xml) → 2 rangées = 220dp, + 12dp de padding bas
+            du RecyclerView + 4dp de padding haut = 236dp. Avec un pourcentage
+            (weight), la place réellement disponible dépend de la hauteur de
+            l'écran et pouvait devenir insuffisante sur certains appareils,
+            ce qui écrase/chevauche visuellement la 2e rangée sur la 1re dans
+            un GridLayoutManager horizontal (le span est réparti sur la
+            hauteur allouée, donc s'il manque de place, les rangées se
+            resserrent l'une sur l'autre). Une hauteur FIXE, dimensionnée
+            exactement pour le contenu réel, élimine ce risque : les 2
+            rangées ont TOUJOURS assez de place, jamais plus, jamais moins.
             ===========================================================
         -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recyclerHomePostersTop"
-            android:layout_width="match_parent" android:layout_height="0dp"
-            android:layout_weight="0.85"
+            android:layout_width="match_parent" android:layout_height="236dp"
             android:clipToPadding="false"
             android:paddingStart="34dp" android:paddingEnd="34dp"
-            android:paddingBottom="4dp" />
+            android:paddingTop="4dp" android:paddingBottom="12dp" />
 
+        <!-- Recyclerview Séries de l'accueil retirée (span demandé : 2 rangées
+             au total sur l'écran d'accueil). L'ID est conservé caché (1dp/gone)
+             pour ne pas casser le binding généré par ViewBinding. -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recyclerHomePostersBot"
-            android:layout_width="match_parent" android:layout_height="0dp"
-            android:layout_weight="0.85"
-            android:clipToPadding="false"
-            android:paddingStart="34dp" android:paddingEnd="34dp"
-            android:paddingBottom="12dp" />
+            android:layout_width="1dp" android:layout_height="1dp"
+            android:visibility="gone" />
 
         <!-- Anciens IDs conservés (1dp / gone) pour ne pas casser le binding code généré. -->
         <androidx.recyclerview.widget.RecyclerView android:id="@+id/recyclerHomePosters"
