@@ -416,7 +416,14 @@ object XtreamApiClient {
     /** Programme en cours (ou à venir) pour une chaîne Live. */
     data class EpgProgram(val title: String, val startTime: String, val endTime: String)
 
-    private val epgCache = java.util.Collections.synchronizedMap(mutableMapOf<String, EpgProgram?>())
+    // CORRECTIF (mémoire) : cache plafonné (LRU, 200 entrées max) au lieu d'une
+    // map sans limite qui grossissait sans fin pendant une longue session de
+    // lecture/zapping sur les box bas de gamme.
+    private val epgCache = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, EpgProgram?>(128, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, EpgProgram?>?): Boolean = size > 200
+        }
+    )
 
     /**
      * Récupère le programme en cours pour une chaîne Live via l'API EPG native
@@ -472,7 +479,11 @@ object XtreamApiClient {
         }
     }
 
-    private val guideCache = java.util.Collections.synchronizedMap(mutableMapOf<String, List<EpgProgram>>())
+    private val guideCache = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, List<EpgProgram>>(128, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<EpgProgram>>?): Boolean = size > 200
+        }
+    )
 
     /**
      * Récupère le programme complet à venir (pas seulement l'émission en
@@ -533,7 +544,11 @@ object XtreamApiClient {
     /** Une émission avec ses horaires en epoch millis (nécessaire pour positionner les blocs de la grille EPG). */
     data class EpgSlotRaw(val title: String, val startMillis: Long, val endMillis: Long)
 
-    private val slotsCache = java.util.Collections.synchronizedMap(mutableMapOf<String, List<EpgSlotRaw>>())
+    private val slotsCache = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, List<EpgSlotRaw>>(128, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<EpgSlotRaw>>?): Boolean = size > 200
+        }
+    )
 
     /**
      * Version "brute" (avec timestamps réels) de [fetchProgramGuide], utilisée

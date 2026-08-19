@@ -41,6 +41,17 @@ class LicenseActivity : AppCompatActivity() {
         val deviceKey = DeviceKeyManager.getDeviceKey(this)
         binding.tvDeviceKey.text = getString(R.string.device_key_format, deviceKey)
 
+        // CORRECTIF (QR code visible dès l'ouverture) : la clé appareil n'était
+        // affichée en QR que dans AboutActivity, inaccessible avant connexion.
+        // On génère maintenant le QR directement sur cet écran d'activation,
+        // pour que l'admin puisse le scanner sans que l'utilisateur se connecte.
+        QrCodeGenerator.generateForDeviceKey(deviceKey).let { qr ->
+            if (qr != null) {
+                binding.ivDeviceKeyQr.setImageBitmap(qr)
+                binding.ivDeviceKeyQr.visibility = android.view.View.VISIBLE
+            }
+        }
+
         refreshUiState()
 
         // Revérifie automatiquement auprès de Firebase à l'ouverture de l'écran,

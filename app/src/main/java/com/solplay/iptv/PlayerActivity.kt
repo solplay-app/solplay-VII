@@ -137,6 +137,27 @@ class PlayerActivity : AppCompatActivity() {
         binding.btnAspectRatio.visibility  = View.GONE
     }
 
+    /**
+     * CORRECTIF (blocage après une longue période de lecture) : sur IPTV, quand
+     * un flux meurt (token/session expiré, serveur qui arrête de servir),
+     * ExoPlayer reste bloqué en STATE_BUFFERING SANS jamais déclencher
+     * onPlayerError - donc aucune des récupérations existantes ne se lance et
+     * l'app semble figée (spinner ou image gelée). Ce watchdog surveille le
+     * temps passé en buffering : s'il dépasse [bufferingStallMs], on force une
+     * récupération avec une URL FRAÎCHE (re-fetch de la playlist), au lieu de
+     * retenter indéfiniment la même URL morte.
+     */
+    private var bufferingSinceMs = 0L
+    private var recoveringFromStall = false
+    private val bufferingStallMs = 25_000L
+    private val stallCheckHandler = Handler(Looper.getMainLooper())
+    private val stallCheckRunnable = object : Runnable {
+        override fun run() {
+            checkForStalledBuffering()
+            stallCheckHandler.postDelayed(this, 5_000L)
+        }
+    }
+
     // ──────────────────────────────────────────────────────────
     // onCreate
     // ──────────────────────────────────────────────────────────
@@ -256,9 +277,15 @@ class PlayerActivity : AppCompatActivity() {
 
                 override fun onPlaybackStateChanged(state: Int) {
                     when (state) {
-                        Player.STATE_BUFFERING -> showBuffering(true)
+                        Player.STATE_BUFFERING -> {
+                            showBuffering(true)
+                            // Début du buffer (watchdog anti-blocage) : on note
+                            // l'instant, sauf si on y était déjà (buffering continu).
+                            if (bufferingSinceMs == 0L) bufferingSinceMs = System.currentTimeMillis()
+                        }
                         Player.STATE_READY     -> {
                             showBuffering(false)
+                            bufferingSinceMs = 0L
                             binding.errorOverlay.visibility = View.GONE
                             cancelBackgroundRetry()
                             // La lecture est repartie normalement : on remet à zéro
@@ -308,6 +335,8 @@ class PlayerActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         registerNetworkCallback()
+        // Watchdog anti-blocage : démarre dès que l'écran lecteur est visible.
+        stallCheckHandler.post(stallCheckRunnable)
         if (player == null) {
             val ch = currentChannel
             initPlayer()
@@ -783,6 +812,60 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Vérifie toutes les 5s si ExoPlayer est bloqué en buffering depuis trop
+     * longtemps (flux mort sans onPlayerError) et, si oui, déclenche la
+     * récupération avec une URL fraîche.
+     */
+    private fun checkForStalledBuffering() {
+        val exo = player ?: return
+        if (exo.playbackState != Player.STATE_BUFFERING) {
+            bufferingSinceMs = 0L
+            return
+        }
+        if (bufferingSinceMs == 0L) bufferingSinceMs = System.currentTimeMillis()
+        if (System.currentTimeMillis() - bufferingSinceMs < bufferingStallMs) return
+        recoverFromStall()
+    }
+
+    /**
+     * Récupération d'un flux mort : recharge la playlist pour obtenir une URL
+     * fraîche de la même chaîne et relance la lecture. Si le rechargement
+     * échoue, on retente la même URL une dernière fois puis on affiche
+     * l'overlay d'erreur avec les réessais automatiques en arrière-plan.
+     */
+    private fun recoverFromStall() {
+        if (isFinishing || recoveringFromStall) return
+        val ch = currentChannel ?: return
+        recoveringFromStall = true
+        binding.tvErrorSubMessage.text = "Flux interrompu, récupération d'une nouvelle adresse…"
+        Log.w("SOLPLAY", "Stall détecté après ${bufferingStallMs / 1000}s de buffer sur '${ch.name}'")
+        lifecycleScope.launch {
+            val playlist = activePlaylist
+            val fresh = if (playlist != null) {
+                val refreshed = ChannelRefresher.refresh(this@PlayerActivity, playlist)
+                refreshed?.firstOrNull { it.name == ch.name }
+            } else null
+            recoveringFromStall = false
+            if (isFinishing) return@launch
+            if (fresh != null) {
+                Log.i("SOLPLAY", "URL fraîche obtenue pour '${ch.name}'")
+                quickRetryCount = 0
+                hasRetriedAfterRefresh = false
+                playStreamInternal(fresh.streamUrl, fresh.name)
+            } else {
+                // Re-fetch impossible : on retente la même URL une dernière fois,
+                // puis on passe sur l'overlay d'erreur + réessais en arrière-plan.
+                player?.apply {
+                    setMediaItem(buildLiveMediaItem(ch.streamUrl))
+                    prepare()
+                    playWhenReady = true
+                }
+                showErrorOverlayAndScheduleBackgroundRetry()
+            }
+        }
+    }
+
     // ──────────────────────────────────────────────────────────
     // Erreur de lecture
     // ──────────────────────────────────────────────────────────
@@ -1003,6 +1086,7 @@ class PlayerActivity : AppCompatActivity() {
         super.onStop()
         saveResumePosition()
         hideHandler.removeCallbacks(hideControlsRunnable)
+        stallCheckHandler.removeCallbacks(stallCheckRunnable)
         cancelBackgroundRetry()
         unregisterNetworkCallback()
         player?.release()
