@@ -12,7 +12,7 @@
     </item>
     <item android:state_pressed="true">
         <shape android:shape="oval">
-            <solid android:color="#00F5FF_dark" />
+            <solid android:color="#00B8C4" />
         </shape>
     </item>
     <item>
