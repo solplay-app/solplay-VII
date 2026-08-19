@@ -175,7 +175,12 @@ class HomeActivity : AppCompatActivity() {
         if (movies.isNotEmpty()) {
             binding.tvPosterSectionLabel.visibility = View.VISIBLE
             binding.recyclerHomePostersTop.visibility = View.VISIBLE
-            val gridMovies = GridLayoutManager(this, 4, RecyclerView.HORIZONTAL, false)
+            // DEUX rangées propres de vignettes (spanCount = nombre de RANGÉES en
+            // orientation HORIZONTAL). L'ancien code utilisait spanCount=4, ce qui
+            // empilait 4 rangées dans la hauteur prévue pour 1 et écrasait chaque
+            // affiche à 1/4 de sa hauteur ("bandes/stores vénitiens"). spanCount=2
+            // donne deux rangées bien proportionnées, conforme à la demande.
+            val gridMovies = GridLayoutManager(this, 2, RecyclerView.HORIZONTAL, false)
             binding.recyclerHomePostersTop.layoutManager = gridMovies
             val adapterMovies = ChannelAdapter(movies, itemLayoutRes = R.layout.item_home_poster) { ch -> playFromHome(ch) }
             homePosterAdapterTop = adapterMovies
@@ -191,7 +196,7 @@ class HomeActivity : AppCompatActivity() {
         // Rangée 2 : SERIES.
         if (series.isNotEmpty()) {
             binding.recyclerHomePostersBot.visibility = View.VISIBLE
-            val gridSeries = GridLayoutManager(this, 4, RecyclerView.HORIZONTAL, false)
+            val gridSeries = GridLayoutManager(this, 2, RecyclerView.HORIZONTAL, false)
             binding.recyclerHomePostersBot.layoutManager = gridSeries
             val adapterSeries = ChannelAdapter(series, itemLayoutRes = R.layout.item_home_poster) { ch -> playFromHome(ch) }
             homePosterAdapterBot = adapterSeries
@@ -241,6 +246,7 @@ class HomeActivity : AppCompatActivity() {
             listener(
                 onSuccess = { _, result ->
                     heroSwapPending = false
+                    binding.ivHeroPlaceholderLogo.animate().alpha(0f).setDuration(heroSwapDuration).start()
                     val bitmap = (result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
                     if (bitmap != null) updateHeroBackground(bitmap)
                     // CROSSFADE : entrée vers 1.f (durée 600ms) + sortie de l'ancien vers 0.f.

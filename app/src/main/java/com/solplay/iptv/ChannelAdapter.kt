@@ -4,8 +4,6 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
@@ -71,15 +69,12 @@ class ChannelAdapter(
         // que ce ViewHolder affiche toujours le même élément (il a pu être
         // recyclé pour une autre position pendant l'attente réseau).
         holder.itemView.tag = channel
-        if (itemLayoutRes == R.layout.item_home_poster) {
-            val border = if (position % 3 == 0) Color.rgb(255, 122, 0) else Color.rgb(0, 242, 255)
-            holder.itemView.background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = 12f
-                setColor(Color.TRANSPARENT)
-                setStroke(2, border)
-            }
-        }
+        // NOTE : ne PAS écraser holder.itemView.background ici. Le fond de
+        // la tuile (item_home_poster.xml -> bg_poster_item_selector) est un
+        // StateListDrawable qui gère déjà liseré fin au repos / liseré épais
+        // orange au focus / halo au clic. L'écraser ici avec un rectangle
+        // fixe (comme avant) supprimait ces états : le sélecteur ne
+        // réagissait plus jamais visuellement au focus/à la sélection.
         holder.logo.alpha = 0f
 
         if (!channel.logoUrl.isNullOrEmpty()) {
