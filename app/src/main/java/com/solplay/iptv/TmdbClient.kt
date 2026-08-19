@@ -8,6 +8,7 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 
 /** Résultat TMDB minimal utile à l'affichage dans la liste des chaînes. */
 data class TmdbInfo(
@@ -58,7 +59,14 @@ object TmdbClient {
         10768 to "Guerre"
     )
 
-    private val client = OkHttpClient.Builder().build()
+    // Timeouts courts (au lieu des 10s par défaut d'OkHttp) : en cas de requête
+    // qui traîne, on échoue vite plutôt que de laisser la miniature du hero
+    // rester noire pendant de longues secondes.
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
+        .writeTimeout(5, TimeUnit.SECONDS)
+        .build()
 
     // Cache en mémoire : évite de refaire un appel réseau pour chaque scroll
     // de la RecyclerView sur un titre déjà résolu (ou déjà su introuvable).

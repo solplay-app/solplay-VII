@@ -22,6 +22,9 @@ import com.solplay.iptv.databinding.ActivityHomeBinding
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -156,20 +159,17 @@ class HomeActivity : AppCompatActivity() {
     private val homeRowLimit = 16
 
     private var homePosterAdapterTop: ChannelAdapter? = null
-    private var homePosterAdapterBot: ChannelAdapter? = null
 
     /**
-     * Configure les DEUX rangées d'affiches :
-     *  - Rangée 1 (TOP) : Films
-     *  - Rangée 2 (BOT) : Séries
-     * Chacune utilise un GridLayoutManager horizontal à 4 colonnes.
+     * Configure les DEUX rangées de tuiles de l'écran d'accueil, réservées aux
+     * Films (span=2 sur un seul RecyclerView horizontal → 2 rangées). Les
+     * Séries ne sont plus dupliquées ici ; elles restent accessibles via le
+     * menu latéral SERIES → ChannelsActivity.
      * Le sélecteur par défaut (1ère tuile sélectionnée) rend le sélecteur visible dès l'ouverture.
      */
     private fun setupHomePosterRows() {
         val movies = ChannelRepository.channels
             .filter { it.contentType() == ContentType.MOVIE }.take(homeRowLimit)
-        val series = ChannelRepository.channels
-            .filter { it.contentType() == ContentType.SERIES }.take(homeRowLimit)
 
         // Rangée 1 : FILMS.
         if (movies.isNotEmpty()) {
@@ -193,26 +193,30 @@ class HomeActivity : AppCompatActivity() {
             binding.recyclerHomePostersTop.visibility = View.GONE
         }
 
-        // Rangée 2 : SERIES.
-        if (series.isNotEmpty()) {
-            binding.recyclerHomePostersBot.visibility = View.VISIBLE
-            val gridSeries = GridLayoutManager(this, 2, RecyclerView.HORIZONTAL, false)
-            binding.recyclerHomePostersBot.layoutManager = gridSeries
-            val adapterSeries = ChannelAdapter(series, itemLayoutRes = R.layout.item_home_poster) { ch -> playFromHome(ch) }
-            homePosterAdapterBot = adapterSeries
-            binding.recyclerHomePostersBot.adapter = adapterSeries
-        } else {
-            binding.recyclerHomePostersBot.visibility = View.GONE
-        }
+        // Rangée Séries retirée de l'accueil (accessible via le menu latéral SERIES) :
+        // l'écran d'accueil garde uniquement les DEUX rangées de Films.
+        binding.recyclerHomePostersBot.visibility = View.GONE
 
         // Le hero (miniature rotative du haut) utilise les FILMS.
+        //
+        // CORRECTIF "zone toujours noire" : l'ancien code résolvait les affiches
+        // TMDB une par une, en SÉRIE (chaque appel réseau attendait le précédent).
+        // Avec jusqu'à 16 films, une seule requête lente/qui traîne bloquait tout
+        // le lot, et heroItems n'était renseigné qu'une fois LA TOTALITÉ des appels
+        // terminés → le hero pouvait rester noir très longtemps, voire indéfiniment
+        // en cas de requête bloquée. On lance maintenant les recherches TMDB EN
+        // PARALLÈLE (async/awaitAll) et on affiche la miniature dès que la première
+        // affiche valide est disponible, sans attendre les autres.
         lifecycleScope.launch {
-            val resolved = movies.mapNotNull { channel ->
-                val url = channel.logoUrl?.takeIf { it.isNotBlank() } ?: run {
-                    val result = withContext(Dispatchers.IO) { TmdbClient.searchMovie(channel.name) }
-                    result.info?.posterUrl
-                }
-                if (!url.isNullOrBlank()) channel to url else null
+            val heroCandidates = movies.take(heroMaxItems)
+            val resolved = coroutineScope {
+                heroCandidates.map { channel ->
+                    async(Dispatchers.IO) {
+                        val url = channel.logoUrl?.takeIf { it.isNotBlank() }
+                            ?: TmdbClient.searchMovie(channel.name).info?.posterUrl
+                        if (!url.isNullOrBlank()) channel to url else null
+                    }
+                }.awaitAll().filterNotNull()
             }
             if (isFinishing || isDestroyed) return@launch
             heroItems = resolved
@@ -223,6 +227,11 @@ class HomeActivity : AppCompatActivity() {
             }
         }
     }
+
+    /** Nombre de films dont on résout l'affiche pour la rotation du hero
+     *  (inutile d'interroger TMDB pour les 16 tuiles de la grille : le hero
+     *  n'affiche qu'un sous-ensemble en rotation). */
+    private val heroMaxItems = 8
 
     /**
      * CROSSFADE fluide entre miniatures hérö :
@@ -316,8 +325,7 @@ class HomeActivity : AppCompatActivity() {
             showHomeParentalPinDialog { playFromHome(channel) }
             return
         }
-        val all = homePosterAdapterTop?.currentList().orEmpty() +
-            homePosterAdapterBot?.currentList().orEmpty()
+        val all = homePosterAdapterTop?.currentList().orEmpty()
         ChannelRepository.setPlayingList(all.ifEmpty { listOf(channel) })
         val intent = Intent(this, PlayerActivity::class.java)
         intent.putExtra(PlayerActivity.EXTRA_STREAM_URL, channel.streamUrl)
