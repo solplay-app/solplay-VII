@@ -6,14 +6,14 @@
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <solid android:color="#1FFFF7A00" />
+            <solid android:color="#1FFFF7A0" />
             <corners android:radius="12dp" />
             <stroke android:width="4dp" android:color="@color/solplay_orange" />
         </shape>
     </item>
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <solid android:color="#1FFFF7A00" />
+            <solid android:color="#1FFFF7A0" />
             <corners android:radius="12dp" />
             <stroke android:width="3dp" android:color="@color/solplay_orange" />
         </shape>
