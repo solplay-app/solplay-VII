@@ -143,17 +143,22 @@
         <!-- HERO : zone de la miniature rotative avec CROSSFADE. -->
         <FrameLayout android:id="@+id/heroContainer"
             android:layout_width="match_parent" android:layout_height="0dp"
-            android:layout_weight="0.95"
+            android:layout_weight="0.65"
             android:layout_marginStart="18dp" android:layout_marginEnd="18dp"
             android:layout_marginTop="4dp"
-            android:background="#050D16" android:clipToOutline="true">
+            android:background="@drawable/bg_hero_placeholder" android:clipToOutline="true">
             <View android:id="@+id/heroBackdropTint" android:layout_width="match_parent"
-                android:layout_height="match_parent" android:background="#050D16" />
+                android:layout_height="match_parent" android:background="@android:color/transparent" />
+            <ImageView android:id="@+id/ivHeroPlaceholderLogo"
+                android:layout_width="72dp" android:layout_height="72dp"
+                android:layout_gravity="center" android:alpha="0.35"
+                android:src="@drawable/ic_solplay_logo"
+                android:contentDescription="" />
             <ImageView android:id="@+id/ivHeroBackdrop" android:layout_width="match_parent"
                 android:layout_height="match_parent" android:scaleType="centerCrop"
-                android:background="#050D16"
+                android:background="@android:color/transparent"
                 android:contentDescription="Miniature du film sélectionné"
-                android:alpha="99" />
+                android:alpha="0" />
             <ImageView android:id="@+id/ivHeroBackdropNext" android:layout_width="match_parent"
                 android:layout_height="match_parent" android:scaleType="centerCrop"
                 android:background="@android:color/transparent"
@@ -202,7 +207,7 @@
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recyclerHomePostersTop"
             android:layout_width="match_parent" android:layout_height="0dp"
-            android:layout_weight="0.55"
+            android:layout_weight="0.85"
             android:clipToPadding="false"
             android:paddingStart="34dp" android:paddingEnd="34dp"
             android:paddingBottom="4dp" />
@@ -210,7 +215,7 @@
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recyclerHomePostersBot"
             android:layout_width="match_parent" android:layout_height="0dp"
-            android:layout_weight="0.55"
+            android:layout_weight="0.85"
             android:clipToPadding="false"
             android:paddingStart="34dp" android:paddingEnd="34dp"
             android:paddingBottom="12dp" />

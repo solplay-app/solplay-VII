@@ -6,6 +6,7 @@
     android:layout_width="168dp"
     android:layout_height="100dp"
     android:layout_marginEnd="20dp"
+    android:layout_marginBottom="10dp"
     android:padding="3dp"
     android:background="@drawable/bg_poster_item_selector"
     android:focusable="true"

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fond affiché dans le hero TANT QUE l'affiche du film n'a pas encore été
+     chargée (au lieu d'un rectangle noir vide). Dégradé radial bleu nuit
+     avec un léger halo cyan, dans l'esprit de la charte SolPlay. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="90"
+                android:startColor="#0A2233"
+                android:centerColor="#061826"
+                android:endColor="#020814" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="380dp"
+                android:centerX="0.5"
+                android:centerY="0.5"
+                android:startColor="#3300F5FF"
+                android:endColor="#00000000" />
+        </shape>
+    </item>
+</layer-list>
