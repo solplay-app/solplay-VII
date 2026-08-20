@@ -292,7 +292,7 @@ class PlayerActivity : AppCompatActivity() {
      * n'est PAS borné par défaut : il grossit indéfiniment tout au long du
      * visionnage, jusqu'à épuiser la mémoire disponible et faire se bloquer
      * ou planter la lecture après un long moment (exactement le symptôme
-     * décrit). setBackBufferDurationMs borne ce buffer à une fenêtre
+     * décrit). setBackBuffer borne ce buffer à une fenêtre
      * modeste (30s, juste assez pour absorber d'éventuels petits retours en
      * arrière) : au-delà, les données déjà jouées sont libérées AU FUR ET À
      * MESURE que la lecture avance, au lieu de s'accumuler sans limite.
@@ -300,7 +300,7 @@ class PlayerActivity : AppCompatActivity() {
     private val iptvLoadControl by lazy {
         DefaultLoadControl.Builder()
             .setBufferDurationsMs(20_000, 40_000, 3_000, 6_000)
-            .setBackBufferDurationMs(30_000, true)
+            .setBackBuffer(30_000, true)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
     }
