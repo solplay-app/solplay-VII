@@ -25,6 +25,9 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
+import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.solplay.iptv.databinding.ActivityPlayerBinding
 import kotlinx.coroutines.Job
@@ -209,61 +212,131 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     /**
-     * Construit un MediaItem avec un ciblage explicite du "direct" (live
-     * edge), au lieu du comportement par défaut d'ExoPlayer.
+     * Construit un MediaItem, avec un ciblage explicite du "direct" (live
+     * edge) UNIQUEMENT pour les chaînes Live, au lieu du comportement par
+     * défaut d'ExoPlayer.
      *
-     * Sans ça, un flux live IPTV visionné pendant plusieurs heures d'affilée
-     * a tendance à dériver de plus en plus loin derrière le vrai direct (le
-     * buffer s'accumule progressivement) - un défaut classique des flux
-     * live mal configurés, que les vraies apps IPTV corrigent en donnant à
-     * ExoPlayer une cible de latence à maintenir : le lecteur ajuste alors
-     * très légèrement sa vitesse de lecture (imperceptible à l'oreille/l'œil)
-     * pour rattraper ou ralentir automatiquement et rester proche de cette
-     * cible, plutôt que de dériver sans contrôle.
+     * CORRECTIF : cette configuration "live" (cible de latence + vitesse de
+     * lecture ajustable 0.98x-1.04x) était auparavant appliquée à TOUTES les
+     * lectures, y compris les films/séries en VOD - elle est sans effet
+     * concret sur un contenu à durée fixe (ExoPlayer l'ignore hors flux
+     * réellement signalé "live"), mais reste un non-sens à corriger : pour
+     * la VOD, on construit maintenant un MediaItem simple, sans aucun
+     * ajustement de vitesse ni ciblage de latence.
+     *
+     * Sans le ciblage "live" ci-dessous, un flux live IPTV visionné pendant
+     * plusieurs heures d'affilée a tendance à dériver de plus en plus loin
+     * derrière le vrai direct (le buffer s'accumule progressivement) - un
+     * défaut classique des flux live mal configurés, que les vraies apps
+     * IPTV corrigent en donnant à ExoPlayer une cible de latence à
+     * maintenir : le lecteur ajuste alors très légèrement sa vitesse de
+     * lecture (imperceptible à l'oreille/l'œil) pour rattraper ou ralentir
+     * automatiquement et rester proche de cette cible, plutôt que de dériver
+     * sans contrôle.
      */
-    private fun buildLiveMediaItem(url: String): MediaItem =
-        MediaItem.Builder()
-            .setUri(url)
-            .setLiveConfiguration(
+    private fun buildMediaItem(url: String, isLive: Boolean): MediaItem {
+        val builder = MediaItem.Builder().setUri(url)
+        if (isLive) {
+            builder.setLiveConfiguration(
                 MediaItem.LiveConfiguration.Builder()
                     .setTargetOffsetMs(12_000) // ~12s derrière le direct : marge raisonnable pour absorber les micro-coupures sans lag perceptible
                     .setMinPlaybackSpeed(0.98f)
                     .setMaxPlaybackSpeed(1.04f)
                     .build()
             )
-            .build()
+        }
+        return builder.build()
+    }
+
+    /** Raccourci pour les URLs dont on sait déjà (par construction) qu'elles sont Live. */
+    private fun buildLiveMediaItem(url: String): MediaItem = buildMediaItem(url, isLive = true)
+
+    /** Construit le MediaItem adapté en se basant sur le type réel de la chaîne. */
+    private fun buildMediaItemFor(channel: Channel): MediaItem =
+        buildMediaItem(channel.streamUrl, isLive = channel.contentType() == ContentType.LIVE)
 
     /**
      * Configuration du buffer ExoPlayer adaptée à l'IPTV, au lieu des
      * réglages par défaut (pensés pour du streaming classique type
      * YouTube/Netflix, sur des CDN stables).
      *
-     * Les serveurs IPTV sont généralement bien moins stables (coupures,
-     * ralentissements plus fréquents) - mais paradoxalement, un buffer trop
-     * GRAND (les 50 secondes par défaut d'ExoPlayer) est contre-productif
-     * en direct : ça prend du temps à se remplir au démarrage/changement de
-     * chaîne (lecture qui met du temps à commencer), et fait prendre du
-     * retard sur le direct au fil du temps. On réduit donc le buffer cible
-     * ET le temps nécessaire avant de démarrer/reprendre la lecture, pour
-     * un ressenti plus proche des lecteurs IPTV du marché (TiviMate,
-     * IPTV Smarters) :
-     * - minBufferMs (15s) / maxBufferMs (30s) : buffer cible plus modeste
-     *   que les 50s par défaut - suffisant pour absorber les instabilités
-     *   réseau typiques d'un flux IPTV, sans accumuler un retard excessif
-     *   sur le direct.
-     * - bufferForPlaybackMs (1.5s) : ce qu'il faut en buffer pour DÉMARRER
-     *   la lecture (par défaut 2.5s) - légèrement réduit pour un démarrage
-     *   plus rapide au changement de chaîne.
-     * - bufferForPlaybackAfterRebufferMs (3s) : ce qu'il faut en buffer
-     *   pour REPRENDRE après une coupure (par défaut 5s) - réduit pour une
-     *   reprise plus rapide après les micro-coupures fréquentes en IPTV.
+     * CORRECTIF (bug "lecture très saccadée, trop de coupures") : les
+     * précédents réglages (bufferForPlaybackMs=1.5s, bufferForPlaybackAfter
+     * RebufferMs=3s) étaient TROP agressifs pour un flux IPTV, dont le débit
+     * réseau est justement irrégulier. Avec une marge aussi faible, le
+     * lecteur repart dès qu'il a 1.5-3s de buffer, décroche presque aussitôt
+     * à la moindre fluctuation, rebufferise avec à peine plus de marge,
+     * redécroche… ce qui crée une VÉRITABLE BOUCLE DE SACCADES au lieu
+     * d'absorber les instabilités réseau (l'inverse de l'effet recherché).
+     * On remonte donc ces deux seuils à des valeurs qui laissent une vraie
+     * marge d'absorption, au prix d'un tout petit délai de démarrage/reprise
+     * supplémentaire (à peine perceptible, largement compensé par une
+     * lecture stable) :
+     * - minBufferMs (20s) / maxBufferMs (40s) : buffer cible confortable
+     *   pour amortir les ralentissements typiques d'un flux IPTV, sans
+     *   accumuler un retard excessif sur le direct.
+     * - bufferForPlaybackMs (3s) : buffer nécessaire pour DÉMARRER la
+     *   lecture - proche du défaut ExoPlayer (2.5s), pour un vrai coussin
+     *   dès le premier démarrage/changement de chaîne.
+     * - bufferForPlaybackAfterRebufferMs (6s) : buffer nécessaire pour
+     *   REPRENDRE après une coupure - supérieur au défaut (5s) : c'est le
+     *   réglage le plus déterminant contre les boucles de saccades, car
+     *   c'est lui qui évite de repartir trop tôt juste pour redécrocher
+     *   aussitôt.
+     *
+     * CORRECTIF (bug "la lecture finit par se bloquer après un moment") :
+     * par défaut, ExoPlayer conserve aussi un "back buffer" (les données
+     * déjà JOUÉES, gardées en mémoire pour permettre un retour arrière
+     * rapide). En VOD ce n'est jamais un problème (durée finie), mais en
+     * LIVE - regardé parfois pendant des heures d'affilée - ce back buffer
+     * n'est PAS borné par défaut : il grossit indéfiniment tout au long du
+     * visionnage, jusqu'à épuiser la mémoire disponible et faire se bloquer
+     * ou planter la lecture après un long moment (exactement le symptôme
+     * décrit). setBackBufferDurationMs borne ce buffer à une fenêtre
+     * modeste (30s, juste assez pour absorber d'éventuels petits retours en
+     * arrière) : au-delà, les données déjà jouées sont libérées AU FUR ET À
+     * MESURE que la lecture avance, au lieu de s'accumuler sans limite.
      */
     private val iptvLoadControl by lazy {
         DefaultLoadControl.Builder()
-            .setBufferDurationsMs(15_000, 30_000, 1_500, 3_000)
+            .setBufferDurationsMs(20_000, 40_000, 3_000, 6_000)
+            .setBackBufferDurationMs(30_000, true)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
     }
+
+    /**
+     * CORRECTIF (bug "trop de coupures" - cause la plus fréquente) : par
+     * défaut, quand un simple SEGMENT/chunk réseau échoue à charger (timeout,
+     * paquet perdu, micro-décrochage du serveur IPTV...), ExoPlayer ne
+     * retente que 1 à 4 fois selon le type de contenu avant de faire
+     * remonter l'erreur jusqu'à onPlayerError - qui déclenchait jusqu'ici un
+     * VRAI redémarrage visible du flux (écran noir + rebufferisation
+     * complète), pour un incident réseau qui se serait souvent résolu tout
+     * seul en une fraction de seconde si on avait juste réessayé une fois de
+     * plus. On augmente donc le nombre de tentatives internes ET on ajoute
+     * un court délai progressif entre elles (backoff), pour que ExoPlayer
+     * absorbe lui-même les instabilités réseau typiques de l'IPTV SANS
+     * jamais que l'utilisateur ne voie la moindre coupure - avant même que
+     * notre récupération applicative (handlePlaybackError) n'ait besoin
+     * d'intervenir.
+     */
+    private class IptvLoadErrorHandlingPolicy : DefaultLoadErrorHandlingPolicy() {
+        override fun getMinimumLoadableRetryCount(dataType: Int): Int = 6
+        override fun getRetryDelayMsFor(loadErrorInfo: LoadErrorHandlingPolicy.LoadErrorInfo): Long {
+            // Backoff progressif plafonné : 500ms, 1s, 2s, 4s, puis 4s max.
+            val attempt = loadErrorInfo.errorCount
+            return minOf(500L shl (attempt - 1).coerceAtLeast(0), 4_000L)
+        }
+    }
+
+    /** MediaSourceFactory partagée (lecteur principal + préchargements),
+     *  configurée avec [IptvLoadErrorHandlingPolicy] ci-dessus. */
+    private val iptvMediaSourceFactory by lazy {
+        DefaultMediaSourceFactory(this)
+            .setLoadErrorHandlingPolicy(IptvLoadErrorHandlingPolicy())
+    }
+
 
     // ──────────────────────────────────────────────────────────
     // Création / recréation du lecteur
@@ -271,6 +344,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun initPlayer() {
         if (player != null) return // déjà prêt (ex: tout premier onCreate)
         player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(iptvMediaSourceFactory)
             .setLoadControl(iptvLoadControl)
             .build().also { exo ->
             binding.playerView.player = exo
@@ -314,10 +388,37 @@ class PlayerActivity : AppCompatActivity() {
 
                 override fun onPlayerError(error: PlaybackException) {
                     showBuffering(false)
-                    handlePlaybackError()
+                    if (tryRecoverBehindLiveWindow(exo, error)) return
+                    handlePlaybackError(error)
                 }
             })
         }
+    }
+
+    /**
+     * CORRECTIF (bug "trop de coupures" en direct) : `ERROR_CODE_BEHIND_LIVE_
+     * WINDOW` est de très loin l'erreur ExoPlayer la plus fréquente sur un
+     * flux IPTV live - elle survient dès que la position de lecture prend
+     * trop de retard sur la fenêtre live disponible côté serveur (léger
+     * ralentissement réseau, serveur qui purge ses anciens segments...).
+     * Avant ce correctif, cette erreur (pourtant totalement bénigne et
+     * habituelle en live) déclenchait la MÊME procédure lourde que n'importe
+     * quelle autre erreur : tentatives différées, puis rafraîchissement de
+     * playlist - donc plusieurs secondes de coupure visible pour un
+     * problème qui se résout normalement en un instant.
+     * La vraie récupération, standard pour ce type d'erreur précis, est
+     * immédiate et ne recharge même pas l'URL : on repositionne juste la
+     * lecture sur le direct (`seekToDefaultPosition`) et on relance -
+     * aucun écran noir, aucun délai d'attente, aucune reconnexion réseau.
+     * Retourne true si l'erreur a été absorbée ainsi (l'appelant ne doit
+     * alors PAS déclencher la procédure de récupération lourde).
+     */
+    private fun tryRecoverBehindLiveWindow(exo: ExoPlayer, error: PlaybackException): Boolean {
+        if (error.errorCode != PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) return false
+        if (currentChannel?.contentType() != ContentType.LIVE) return false
+        exo.seekToDefaultPosition()
+        exo.prepare()
+        return true
     }
 
     /**
@@ -622,6 +723,7 @@ class PlayerActivity : AppCompatActivity() {
         for (url in wanted) {
             if (preloadPlayers.containsKey(url)) continue
             val exo = ExoPlayer.Builder(this)
+                .setMediaSourceFactory(iptvMediaSourceFactory)
                 .setLoadControl(iptvLoadControl)
                 .build()
             exo.setMediaItem(buildLiveMediaItem(url))
@@ -674,7 +776,8 @@ class PlayerActivity : AppCompatActivity() {
             }
             override fun onPlayerError(error: PlaybackException) {
                 showBuffering(false)
-                handlePlaybackError()
+                if (tryRecoverBehindLiveWindow(ready, error)) return
+                handlePlaybackError(error)
             }
         })
         ready.playWhenReady = true
@@ -839,7 +942,16 @@ class PlayerActivity : AppCompatActivity() {
         if (isFinishing || recoveringFromStall) return
         val ch = currentChannel ?: return
         recoveringFromStall = true
-        binding.tvErrorSubMessage.text = "Flux interrompu, récupération d'une nouvelle adresse…"
+        // On affiche maintenant un statut clair PENDANT la récupération (au
+        // lieu de laisser le spinner tourner seul 25s sans explication) :
+        // plus rassurant/professionnel, et cohérent avec le comportement de
+        // handlePlaybackError ci-dessous.
+        showBuffering(false)
+        showErrorOverlay(
+            message = "Signal interrompu.",
+            subMessage = "Récupération d'une nouvelle adresse…",
+            scheduleBackgroundRetry = false
+        )
         Log.w("SOLPLAY", "Stall détecté après ${bufferingStallMs / 1000}s de buffer sur '${ch.name}'")
         lifecycleScope.launch {
             val playlist = activePlaylist
@@ -858,11 +970,15 @@ class PlayerActivity : AppCompatActivity() {
                 // Re-fetch impossible : on retente la même URL une dernière fois,
                 // puis on passe sur l'overlay d'erreur + réessais en arrière-plan.
                 player?.apply {
-                    setMediaItem(buildLiveMediaItem(ch.streamUrl))
+                    setMediaItem(buildMediaItemFor(ch))
                     prepare()
                     playWhenReady = true
                 }
-                showErrorOverlayAndScheduleBackgroundRetry()
+                showErrorOverlay(
+                    message = "Cette chaîne n'est pas disponible pour le moment.",
+                    subMessage = "Nouvelle tentative automatique en cours…",
+                    scheduleBackgroundRetry = true
+                )
             }
         }
     }
@@ -870,18 +986,51 @@ class PlayerActivity : AppCompatActivity() {
     // ──────────────────────────────────────────────────────────
     // Erreur de lecture
     // ──────────────────────────────────────────────────────────
-    private fun handlePlaybackError() {
-        // Étape 1 : tentatives rapides et silencieuses sur le MÊME flux.
-        // Couvre le cas très fréquent d'une micro-coupure réseau qui se
-        // résout d'elle-même en 1-2 secondes - l'utilisateur ne voit rien.
+
+    /**
+     * CORRECTIF (bug "tourne en rond au lieu d'afficher une erreur claire") :
+     * certaines erreurs ExoPlayer signifient que le flux est DÉFINITIVEMENT
+     * mort (lien expiré/retiré côté panel, chaîne inexistante, format
+     * illisible...) - retenter rapidement la MÊME URL plusieurs fois
+     * (l'étape 1 "tentatives rapides") ne sert alors à rien et ne fait que
+     * retarder inutilement l'affichage d'un message clair à l'utilisateur.
+     * On distingue donc :
+     *  - les erreurs RÉSEAU/transitoires (timeout, connexion perdue...) →
+     *    on tente d'abord une récupération rapide et silencieuse (l'écran
+     *    ne bouge pas), car elles se résolvent souvent seules en 1-2s.
+     *  - les erreurs DÉFINITIVES (HTTP 403/404, permission refusée, flux
+     *    illisible/mal formé) → on saute directement à la vérification
+     *    côté serveur (compte / URL fraîche), qui est le seul recours utile,
+     *    pour arriver plus vite à un message d'erreur explicite si rien n'y
+     *    fait - au lieu de faire tourner un spinner sans explication pendant
+     *    plusieurs secondes pour rien.
+     */
+    private fun isDefinitelyDeadStream(error: PlaybackException): Boolean = when (error.errorCode) {
+        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+        PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
+        PlaybackException.ERROR_CODE_IO_NO_PERMISSION,
+        PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+        PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
+        PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
+        PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED -> true
+        else -> false
+    }
+
+    private fun handlePlaybackError(error: PlaybackException? = null) {
         val ch = currentChannel
-        if (quickRetryCount < maxQuickRetries && ch != null) {
+        val definitelyDead = error != null && isDefinitelyDeadStream(error)
+
+        // Étape 1 : tentatives rapides et silencieuses sur le MÊME flux -
+        // UNIQUEMENT pour les erreurs transitoires (réseau). Pour un flux
+        // qu'on sait déjà définitivement mort, ça n'aurait aucune chance de
+        // marcher : on passe directement à l'étape 2.
+        if (!definitelyDead && quickRetryCount < maxQuickRetries && ch != null) {
             quickRetryCount++
             val delayMs = 1200L * quickRetryCount // 1.2s puis 2.4s
             hideHandler.postDelayed({
                 if (!isFinishing) {
                     player?.apply {
-                        setMediaItem(buildLiveMediaItem(ch.streamUrl))
+                        setMediaItem(buildMediaItemFor(ch))
                         prepare()
                         playWhenReady = true
                     }
@@ -890,12 +1039,27 @@ class PlayerActivity : AppCompatActivity() {
             return
         }
 
-        // Étape 2 : les tentatives rapides ont échoué -> il peut vraiment y
-        // avoir un problème de compte / de lien cassé, on vérifie côté serveur.
+        // Étape 2 : les tentatives rapides ont échoué (ou étaient inutiles)
+        // -> il peut vraiment y avoir un problème de compte / de lien cassé,
+        // on vérifie côté serveur. Cette étape peut prendre quelques
+        // secondes (appels réseau) : on affiche désormais un statut clair
+        // PENDANT la vérification au lieu de laisser un simple spinner sans
+        // explication ("tourne en rond") - plus professionnel, comme les
+        // lecteurs IPTV du marché.
         val playlist = activePlaylist ?: run {
-            Toast.makeText(this, "Erreur de lecture. Vérifiez votre connexion.", Toast.LENGTH_LONG).show()
+            showErrorOverlay(
+                message = "Impossible de lire cette chaîne.",
+                subMessage = "Vérifiez votre connexion internet.",
+                scheduleBackgroundRetry = true
+            )
             return
         }
+        showBuffering(false)
+        showErrorOverlay(
+            message = if (definitelyDead) "Cette chaîne semble indisponible." else "Problème de lecture détecté.",
+            subMessage = "Vérification en cours…",
+            scheduleBackgroundRetry = false
+        )
         lifecycleScope.launch {
             val status = XtreamApiClient.checkAccountStatus(playlist)
             if (isFinishing) return@launch
@@ -917,29 +1081,46 @@ class PlayerActivity : AppCompatActivity() {
                 val refreshed = ChannelRefresher.refresh(this@PlayerActivity, playlist)
                 val updated = refreshed?.firstOrNull { it.name == prevName }
                 if (updated != null && !isFinishing) {
-                    Toast.makeText(this@PlayerActivity,
-                        "Playlist mise à jour, nouvelle tentative…", Toast.LENGTH_SHORT).show()
+                    binding.tvErrorSubMessage.text = "Adresse actualisée, nouvelle tentative…"
                     playStreamInternal(updated.streamUrl, updated.name)
                 } else {
-                    showErrorOverlayAndScheduleBackgroundRetry()
+                    // Aucune adresse fraîche disponible : c'est bien un vrai
+                    // problème (chaîne retirée du panel, etc.) - message final
+                    // clair, pas un simple spinner qui tourne dans le vide.
+                    showErrorOverlay(
+                        message = "Cette chaîne n'est pas disponible pour le moment.",
+                        subMessage = "Nouvelle tentative automatique en cours…",
+                        scheduleBackgroundRetry = true
+                    )
                 }
             } else {
-                showErrorOverlayAndScheduleBackgroundRetry()
+                showErrorOverlay(
+                    message = "Cette chaîne n'est pas disponible pour le moment.",
+                    subMessage = "Nouvelle tentative automatique en cours…",
+                    scheduleBackgroundRetry = true
+                )
             }
         }
     }
 
     /**
-     * Affiche l'overlay d'erreur (visible, avec bouton "Réessayer maintenant")
-     * et programme des tentatives automatiques silencieuses en arrière-plan -
-     * voir le commentaire sur [backgroundRetryHandler] pour le contexte.
+     * Affiche l'overlay d'erreur avec un message EXPLICITE (au lieu du texte
+     * fixe générique d'avant) et, si demandé, programme les tentatives
+     * automatiques en arrière-plan - voir [backgroundRetryHandler].
+     * scheduleBackgroundRetry=false pendant une simple vérification en cours
+     * (on ne veut pas encore programmer de réessai, l'appelant s'en charge
+     * lui-même une fois le résultat connu).
      */
-    private fun showErrorOverlayAndScheduleBackgroundRetry() {
+    private fun showErrorOverlay(message: String, subMessage: String, scheduleBackgroundRetry: Boolean) {
         if (isFinishing) return
         val alreadyShowing = binding.errorOverlay.visibility == View.VISIBLE
+        binding.tvErrorMessage.text = message
+        binding.tvErrorSubMessage.text = subMessage
         binding.errorOverlay.visibility = View.VISIBLE
-        if (!alreadyShowing) backgroundRetryAttempt = 0
-        scheduleNextBackgroundRetry()
+        if (scheduleBackgroundRetry) {
+            if (!alreadyShowing) backgroundRetryAttempt = 0
+            scheduleNextBackgroundRetry()
+        }
     }
 
     private fun scheduleNextBackgroundRetry() {
@@ -1022,7 +1203,7 @@ class PlayerActivity : AppCompatActivity() {
         // deux lecteurs ouverts sur le même flux.
         preloadPlayers.remove(url)?.release()
         player?.apply {
-            setMediaItem(buildLiveMediaItem(url))
+            setMediaItem(buildMediaItem(url, isLive))
             prepare()
             playWhenReady = true
         }
