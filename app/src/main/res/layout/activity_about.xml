@@ -37,14 +37,6 @@
         android:textColor="@color/solplay_text_secondary"
         android:textSize="13sp" />
 
-    <TextView
-        android:id="@+id/tvDebugOffset"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:textColor="@color/solplay_text_secondary"
-        android:textSize="11sp" />
-
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
@@ -52,30 +44,44 @@
         android:background="@color/solplay_gray" />
 
     <TextView
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="24dp"
-        android:text="Votre clé appareil (pour activer la version Pro) :"
+        android:gravity="center"
+        android:text="Votre clé appareil :"
         android:textColor="@color/solplay_text_secondary" />
 
-    <TextView
-        android:id="@+id/tvDeviceKeyAbout"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:background="@color/solplay_gray"
-        android:padding="12dp"
-        android:textColor="@color/solplay_text_primary_dark"
-        android:textStyle="bold"
-        android:textIsSelectable="true" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="4dp">
 
-    <Button
-        android:id="@+id/btnCopyDeviceKeyAbout"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:text="Copier la clé appareil" />
+        <TextView
+            android:id="@+id/tvDeviceKeyAbout"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:paddingTop="12dp"
+            android:paddingBottom="12dp"
+            android:textColor="@color/solplay_text_primary_dark"
+            android:textIsSelectable="true"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnCopyDeviceKeyAbout"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:minHeight="40dp"
+            android:text="📋 Copier"
+            android:textColor="@color/solplay_orange" />
+    </LinearLayout>
 
     <Button
         android:id="@+id/btnShowQrDeviceKey"
@@ -84,7 +90,7 @@
         android:layout_marginTop="8dp"
         android:backgroundTint="#FF7A00"
         android:textColor="#FFFFFF"
-        android:text="📷 Afficher le QR Code (pour votre admin)" />
+        android:text="📷 Afficher le QR Code" />
 
     <Button
         android:id="@+id/btnRequestRenewal"
