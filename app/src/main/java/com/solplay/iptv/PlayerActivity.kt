@@ -153,6 +153,10 @@ class PlayerActivity : AppCompatActivity() {
      */
     private var bufferingSinceMs = 0L
     private var recoveringFromStall = false
+
+    /** Instant du dernier rechargement COMPLET de la playlist déclenché par une erreur de lecture (anti-boucle). */
+    private var lastForcedRefreshMs = 0L
+    private val minForcedRefreshIntervalMs = 120_000L
     private val bufferingStallMs = 25_000L
     private val stallCheckHandler = Handler(Looper.getMainLooper())
     private val stallCheckRunnable = object : Runnable {
@@ -173,7 +177,8 @@ class PlayerActivity : AppCompatActivity() {
         enableImmersiveFullscreen()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        val startUrl  = intent.getStringExtra(EXTRA_STREAM_URL)  ?: return
+        val startUrl  = intent.getStringExtra(EXTRA_STREAM_URL)
+        if (startUrl.isNullOrBlank()) { finish(); return }
         val startName = intent.getStringExtra(EXTRA_STREAM_NAME) ?: ""
         resumePosForNextReady = intent.getLongExtra(EXTRA_RESUME_POS, 0L)
 
@@ -297,13 +302,24 @@ class PlayerActivity : AppCompatActivity() {
      * arrière) : au-delà, les données déjà jouées sont libérées AU FUR ET À
      * MESURE que la lecture avance, au lieu de s'accumuler sans limite.
      */
-    private val iptvLoadControl by lazy {
+    /**
+     * CORRECTIF (bug "après un moment, plus aucune lecture ne démarre, il faut
+     * supprimer et remettre la playlist") : un [DefaultLoadControl] est lié à UN
+     * SEUL lecteur (il garde l'allocateur mémoire, l'état "en chargement" et la
+     * taille cible du buffer). Il était auparavant partagé (`by lazy`) entre le
+     * lecteur principal et le lecteur préchargé. Or chaque `prepare()` d'un
+     * lecteur préchargé et chaque `release()` (à chaque zapping/fast-swap)
+     * réinitialisait cet état commun ET vidait l'allocateur sous les pieds du
+     * lecteur en cours : ExoPlayer restait alors bloqué en chargement, jusqu'à
+     * ce que l'écran soit recréé. On en construit désormais une NOUVELLE
+     * instance pour chaque lecteur créé.
+     */
+    private fun buildIptvLoadControl(): DefaultLoadControl =
         DefaultLoadControl.Builder()
             .setBufferDurationsMs(20_000, 40_000, 3_000, 6_000)
             .setBackBuffer(30_000, true)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
-    }
 
     /**
      * CORRECTIF (bug "trop de coupures" - cause la plus fréquente) : par
@@ -345,7 +361,7 @@ class PlayerActivity : AppCompatActivity() {
         if (player != null) return // déjà prêt (ex: tout premier onCreate)
         player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(iptvMediaSourceFactory)
-            .setLoadControl(iptvLoadControl)
+            .setLoadControl(buildIptvLoadControl())
             .build().also { exo ->
             binding.playerView.player = exo
             exo.addListener(object : Player.Listener {
@@ -724,7 +740,7 @@ class PlayerActivity : AppCompatActivity() {
             if (preloadPlayers.containsKey(url)) continue
             val exo = ExoPlayer.Builder(this)
                 .setMediaSourceFactory(iptvMediaSourceFactory)
-                .setLoadControl(iptvLoadControl)
+                .setLoadControl(buildIptvLoadControl())
                 .build()
             exo.setMediaItem(buildLiveMediaItem(url))
             // IMPORTANT (correctif) : sans ce listener, un préchargement qui
@@ -762,6 +778,8 @@ class PlayerActivity : AppCompatActivity() {
 
         hasRetriedAfterRefresh = false
         quickRetryCount = 0
+        bufferingSinceMs = 0L
+        recoveringFromStall = false
         player = ready
         binding.playerView.player = ready
         ready.addListener(object : Player.Listener {
@@ -955,12 +973,17 @@ class PlayerActivity : AppCompatActivity() {
         Log.w("SOLPLAY", "Stall détecté après ${bufferingStallMs / 1000}s de buffer sur '${ch.name}'")
         lifecycleScope.launch {
             val playlist = activePlaylist
-            val fresh = if (playlist != null) {
+            // Rechargement complet limité (anti-boucle) : au plus toutes les 2 min.
+            val mayRefresh = System.currentTimeMillis() - lastForcedRefreshMs > minForcedRefreshIntervalMs
+            val fresh = if (playlist != null && mayRefresh) {
+                lastForcedRefreshMs = System.currentTimeMillis()
                 val refreshed = ChannelRefresher.refresh(this@PlayerActivity, playlist)
                 refreshed?.firstOrNull { it.name == ch.name }
             } else null
             recoveringFromStall = false
             if (isFinishing) return@launch
+            // L'utilisateur a changé de contenu pendant la récupération : on n'y touche plus.
+            if (currentChannel?.streamUrl != ch.streamUrl) return@launch
             if (fresh != null) {
                 Log.i("SOLPLAY", "URL fraîche obtenue pour '${ch.name}'")
                 quickRetryCount = 0
@@ -1028,7 +1051,9 @@ class PlayerActivity : AppCompatActivity() {
             quickRetryCount++
             val delayMs = 1200L * quickRetryCount // 1.2s puis 2.4s
             hideHandler.postDelayed({
-                if (!isFinishing) {
+                // CORRECTIF : si l'utilisateur a changé de chaîne/contenu pendant le
+                // délai, on ne remet PAS l'ancienne chaîne par-dessus son choix.
+                if (!isFinishing && currentChannel?.streamUrl == ch.streamUrl) {
                     player?.apply {
                         setMediaItem(buildMediaItemFor(ch))
                         prepare()
@@ -1063,6 +1088,10 @@ class PlayerActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val status = XtreamApiClient.checkAccountStatus(playlist)
             if (isFinishing) return@launch
+            // CORRECTIF : l'utilisateur a pu choisir un autre contenu pendant la
+            // vérification réseau - on abandonne alors cette récupération, devenue
+            // obsolète, au lieu de relancer l'ancienne chaîne par-dessus.
+            if (ch != null && currentChannel?.streamUrl != ch.streamUrl) return@launch
             if (status?.expired == true) {
                 val expiryText = status.expiresAtMillis?.let { TrialManager.formatDate(it) }
                 AlertDialog.Builder(this@PlayerActivity)
@@ -1075,11 +1104,17 @@ class PlayerActivity : AppCompatActivity() {
                     .setPositiveButton("OK") { _, _ -> finish() }
                     .setCancelable(false)
                     .show()
-            } else if (!hasRetriedAfterRefresh) {
+            } else if (!hasRetriedAfterRefresh &&
+                System.currentTimeMillis() - lastForcedRefreshMs > minForcedRefreshIntervalMs
+            ) {
+                // Anti-boucle : un rechargement complet (10 000+ entrées) au plus
+                // toutes les 2 minutes, au lieu d'un à chaque réessai de 30 s.
                 hasRetriedAfterRefresh = true
+                lastForcedRefreshMs = System.currentTimeMillis()
                 val prevName = binding.tvChannelTitle.text.toString()
                 val refreshed = ChannelRefresher.refresh(this@PlayerActivity, playlist)
                 val updated = refreshed?.firstOrNull { it.name == prevName }
+                if (ch != null && currentChannel?.streamUrl != ch.streamUrl) return@launch
                 if (updated != null && !isFinishing) {
                     binding.tvErrorSubMessage.text = "Adresse actualisée, nouvelle tentative…"
                     playStreamInternal(updated.streamUrl, updated.name)
@@ -1196,6 +1231,12 @@ class PlayerActivity : AppCompatActivity() {
 
         binding.tvChannelTitle.text = name
         showBuffering(true)
+        // CORRECTIF : le chronomètre anti-blocage repart de zéro pour ce nouveau
+        // contenu. Avant, si l'ancien flux était déjà en chargement depuis 20 s, le
+        // nouveau en héritait et déclenchait un faux "flux mort" (rechargement
+        // complet de la playlist) 5 s plus tard.
+        bufferingSinceMs = 0L
+        recoveringFromStall = false
         // Si un préchargement existait déjà pour cette URL (ex: l'utilisateur
         // a zappé plus vite que le fast-swap, ou un cas où tryFastSwap n'a
         // pas été utilisé), il devient redondant avec le lecteur principal
