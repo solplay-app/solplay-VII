@@ -164,6 +164,19 @@
         android:contentDescription="QR code de la clé appareil"
         android:visibility="gone" />
 
+    <!-- Bouton « Payer en ligne » placé JUSTE EN DESSOUS du QR code, comme
+         demandé : le client n'a plus besoin de chercher le paiement plus bas.
+         Il ouvre SubscriptionActivity (paiement SasPay), où la clé appareil est
+         déjà pré-affichée et non modifiable. -->
+    <Button
+        android:id="@+id/btnPayOnlineQr"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:backgroundTint="@color/solplay_orange"
+        android:text="Payer en ligne"
+        android:textColor="@color/solplay_white" />
+
     <Button
         android:id="@+id/btnVerifyActivation"
         android:layout_width="match_parent"
