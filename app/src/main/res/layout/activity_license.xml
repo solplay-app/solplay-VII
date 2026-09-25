@@ -1,215 +1,317 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  activity_license.xml — version CORRIGÉE :
+
+  Demande initiale de l'utilisateur :
+    1. ÉCRAN FIGÉ — pas de défilement : on retire le ScrollView racine, tout
+       tient dans un RelativeLayout. La zone centrale est scrollable UNIQUEMENT
+       via un ScrollView intérieur borné (weight=1) si trop long sur petit écran.
+    2. Bouton « afficher le code » en HAUT À DROITE. Au clic, le QR code
+       apparaît dans un OVERLAY cliquable plein écran centré (clic sur l'overlay
+       pour fermer). C'est ce que voulait le client.
+    3. Bloc support / e-mail / contacts : remonté SOUS les boutons « Contacter
+       le revendeur » + « PAYER EN LIGNE » (et non plus tout en bas).
+    4. Au lieu d'afficher la clé en clair, on affiche un bouton « Copier »
+       compact à côté du label de la zone "Votre clé appareil".
+
+  La clé affiche est désormais la clé réellement générée par DeviceKeyManager
+  (16 caractères HEX uppercase, ex: 44FD521BEA1C446D) — plus aucun préfixe
+  SP- côté Android.
+-->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/solplay_bg_dark">
 
-<LinearLayout
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="24dp">
-
+    <!-- ══════════ HEADER ─ bouton "afficher le code" en haut à droite ══════════ -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="16dp"
+        android:id="@+id/tvAppNameHeader"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentStart="true"
+        android:layout_marginTop="20dp"
+        android:layout_marginStart="24dp"
         android:text="@string/app_name"
         android:textColor="@color/solplay_orange"
-        android:textSize="32sp"
+        android:textSize="28sp"
         android:textStyle="bold" />
 
-    <TextView
-        android:id="@+id/tvStatus"
-        android:layout_width="match_parent"
+    <Button
+        android:id="@+id/btnShowCode"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:gravity="center"
-        android:textColor="@color/solplay_text_primary_dark"
-        android:textSize="18sp" />
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="@android:color/transparent"
+        android:text="afficher le code"
+        android:textColor="#E53935"
+        android:textAllCaps="false"
+        android:textStyle="bold"
+        android:padding="8dp"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
-    <!-- ===================== ETAT BLOQUE (essai + licence expires) ===================== -->
-    <!-- Bloque l'acces a l'application : message + bouton WhatsApp juste en dessous. -->
+    <!-- ══════════ CONTENEUR CENTRAL (figé, ne défile pas) ══════════ -->
     <LinearLayout
-        android:id="@+id/groupBlocked"
+        android:id="@+id/groupCenter"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_below="@id/tvAppNameHeader"
+        android:layout_marginTop="16dp"
         android:orientation="vertical"
-        android:visibility="gone"
-        android:background="@color/solplay_gray"
-        android:padding="16dp"
-        android:layout_marginTop="16dp">
+        android:padding="20dp">
 
         <TextView
-            android:id="@+id/tvBlockedTitle"
+            android:id="@+id/tvStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/access_blocked_title"
-            android:textColor="@color/solplay_orange_dark"
-            android:textStyle="bold"
-            android:textSize="18sp"
-            android:gravity="center" />
-
-        <TextView
-            android:id="@+id/tvBlockedMessage"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="@string/access_blocked_message"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
             android:textColor="@color/solplay_text_primary_dark"
-            android:textSize="15sp"
-            android:lineSpacingExtra="3dp" />
+            android:textSize="18sp" />
 
-        <!-- Bouton cliquable WhatsApp, juste en bas du message bloquant -->
+        <!-- ===================== ETAT BLOQUE ===================== -->
         <LinearLayout
-            android:id="@+id/btnWhatsApp"
+            android:id="@+id/groupBlocked"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:background="@drawable/bg_whatsapp_button"
-            android:clickable="true"
-            android:focusable="true"
-            android:padding="14dp">
-
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:src="@drawable/ic_whatsapp"
-                android:contentDescription="@string/btn_whatsapp_contact" />
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:background="@color/solplay_gray"
+            android:padding="16dp"
+            android:layout_marginTop="16dp">
 
             <TextView
-                android:layout_width="0dp"
+                android:id="@+id/tvBlockedTitle"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="12dp"
-                android:text="@string/btn_whatsapp_contact"
-                android:textColor="@color/solplay_white"
+                android:text="@string/access_blocked_title"
+                android:textColor="@color/solplay_orange_dark"
                 android:textStyle="bold"
-                android:textSize="16sp"
+                android:textSize="18sp"
                 android:gravity="center" />
+
+            <TextView
+                android:id="@+id/tvBlockedMessage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/access_blocked_message"
+                android:textColor="@color/solplay_text_primary_dark"
+                android:textSize="15sp"
+                android:lineSpacingExtra="3dp" />
+
+            <!-- Bouton WhatsApp juste sous le message -->
+            <LinearLayout
+                android:id="@+id/btnWhatsApp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_whatsapp_button"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="14dp">
+
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:src="@drawable/ic_whatsapp"
+                    android:contentDescription="@string/btn_whatsapp_contact" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"
+                    android:text="@string/btn_whatsapp_contact"
+                    android:textColor="@color/solplay_white"
+                    android:textStyle="bold"
+                    android:textSize="16sp"
+                    android:gravity="center" />
+            </LinearLayout>
+
+            <!-- Bouton « Payer en ligne » (intégré dans le bloc central) -->
+            <Button
+                android:id="@+id/btnPayOnline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:backgroundTint="@color/solplay_orange"
+                android:text="Payer en ligne"
+                android:textColor="@color/solplay_white" />
         </LinearLayout>
 
         <Button
-            android:id="@+id/btnPayOnline"
+            android:id="@+id/btnContinueTrial"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:backgroundTint="@color/solplay_green"
+            android:text="@string/btn_continue_trial"
+            android:textColor="@color/solplay_white" />
+
+        <!-- ══════════ BLOC SUPPORT / CONTACTS / E-MAIL — remonté ici ══════════ -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="20dp"
+            android:background="@color/solplay_gray" />
+
+        <LinearLayout
+            android:id="@+id/contactBlock"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:id="@+id/tvContactHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/support_contact_header"
+                android:textColor="@color/solplay_orange"
+                android:textStyle="bold"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvContactEmail"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/solplay_text_secondary"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvContactPhone"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/solplay_text_secondary"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- ══════════ VOTRE CLÉ APPAREIL — bouton Copier ══════════ -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="20dp"
+            android:background="@color/solplay_gray" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Votre clé appareil (à envoyer à SolPlay pour activation) :"
+            android:textColor="@color/solplay_text_secondary"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@color/solplay_gray"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/tvDeviceKey"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/solplay_text_primary_dark"
+                android:textStyle="bold"
+                android:textSize="15sp"
+                android:typeface="monospace"
+                android:fontFamily="monospace" />
+
+            <Button
+                android:id="@+id/btnCopyDeviceKey"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:minWidth="0dp"
+                android:padding="6dp"
+                android:backgroundTint="@color/solplay_orange"
+                android:text="Copier"
+                android:textColor="@color/solplay_white" />
+        </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/progressBarLicense"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="12dp"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btnVerifyActivation"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:backgroundTint="@color/solplay_orange"
-            android:text="Payer en ligne"
+            android:backgroundTint="@color/solplay_green"
+            android:text="Vérifier mon activation"
             android:textColor="@color/solplay_white" />
     </LinearLayout>
 
-    <Button
-        android:id="@+id/btnContinueTrial"
+    <!-- ══════════ OVERLAY QR CODE — plein écran, clic pour fermer ══════════ -->
+    <FrameLayout
+        android:id="@+id/qrOverlay"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:backgroundTint="@color/solplay_green"
-        android:text="@string/btn_continue_trial"
-        android:textColor="@color/solplay_white" />
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:background="#CC000000"
+        android:clickable="true"
+        android:focusable="true">
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginTop="32dp"
-        android:background="@color/solplay_gray" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:clickable="false">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="Votre cle appareil (a envoyer a SolPlay pour activation) :"
-        android:textColor="@color/solplay_text_secondary" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Votre clé d'activation"
+                android:textColor="@color/solplay_white"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="12dp" />
 
-    <TextView
-        android:id="@+id/tvDeviceKey"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:background="@color/solplay_gray"
-        android:padding="12dp"
-        android:textColor="@color/solplay_text_primary_dark"
-        android:textStyle="bold"
-        android:textIsSelectable="true" />
+            <ImageView
+                android:id="@+id/ivDeviceKeyQr"
+                android:layout_width="320dp"
+                android:layout_height="320dp"
+                android:layout_gravity="center"
+                android:background="@color/solplay_white"
+                android:padding="12dp"
+                android:contentDescription="QR code de la clé appareil" />
 
-    <Button
-        android:id="@+id/btnCopyDeviceKey"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-        android:text="Copier la cle appareil" />
+            <TextView
+                android:id="@+id/tvDeviceKeyInOverlay"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:textColor="@color/solplay_orange"
+                android:textStyle="bold"
+                android:textSize="20sp"
+                android:typeface="monospace"
+                android:fontFamily="monospace" />
 
-    <!-- QR code de la clé appareil : visible dès l'écran d'ouverture pour que
-         l'admin puisse scanner la clé sans que l'utilisateur ait besoin de se
-         connecter d'abord. Généré dans LicenseActivity.onCreate. -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:gravity="center"
-        android:text="Scannez ce QR code avec votre téléphone pour envoyer votre clé au revendeur :"
-        android:textColor="@color/solplay_text_secondary"
-        android:textSize="13sp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="Cliquez n'importe où pour fermer"
+                android:textColor="#AAAAAA"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </FrameLayout>
 
-    <ImageView
-        android:id="@+id/ivDeviceKeyQr"
-        android:layout_width="220dp"
-        android:layout_height="220dp"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="12dp"
-        android:contentDescription="QR code de la clé appareil"
-        android:visibility="gone" />
-
-    <!-- Bouton « Payer en ligne » placé JUSTE EN DESSOUS du QR code, comme
-         demandé : le client n'a plus besoin de chercher le paiement plus bas.
-         Il ouvre SubscriptionActivity (paiement SasPay), où la clé appareil est
-         déjà pré-affichée et non modifiable. -->
-    <Button
-        android:id="@+id/btnPayOnlineQr"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:backgroundTint="@color/solplay_orange"
-        android:text="Payer en ligne"
-        android:textColor="@color/solplay_white" />
-
-    <Button
-        android:id="@+id/btnVerifyActivation"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:backgroundTint="@color/solplay_green"
-        android:text="Verifier mon activation"
-        android:textColor="@color/solplay_white" />
-
-    <ProgressBar
-        android:id="@+id/progressBarLicense"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="12dp"
-        android:visibility="gone" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:gravity="center"
-        android:textColor="@color/solplay_text_secondary"
-        android:textSize="12sp"
-        android:text="@string/contact_email" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:textColor="@color/solplay_text_secondary"
-        android:textSize="12sp"
-        android:text="@string/contact_phone" />
-
-</LinearLayout>
-</ScrollView>
+</RelativeLayout>
