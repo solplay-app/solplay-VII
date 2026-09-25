@@ -109,6 +109,15 @@ class LicenseActivity : AppCompatActivity() {
         binding.btnPayOnline.setOnClickListener {
             startActivity(Intent(this, SubscriptionActivity::class.java))
         }
+
+        // Bouton « Payer en ligne » situé juste sous le QR code (voir
+        // activity_license.xml) : ouvre l'écran de paiement SasPay. La clé
+        // appareil y est pré-remplie et non modifiable ; après confirmation du
+        // paiement, le webhook SasPay active la licence de CETTE clé et cet
+        // écran se débloque tout seul (vérification automatique ci-dessus).
+        binding.btnPayOnlineQr.setOnClickListener {
+            startActivity(Intent(this, SubscriptionActivity::class.java))
+        }
     }
 
     /**

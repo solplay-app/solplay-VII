@@ -24,16 +24,27 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
  * Écran d'abonnement / paiement direct.
  *
- * Le vrai déblocage se fait uniquement côté serveur après webhook Djèko.
- * L'app, elle, prépare maintenant une "intention de paiement" dans Firebase
- * avec le numéro saisi par le client : si Djèko renvoie ensuite ce même numéro
- * dans le webhook, le serveur peut retrouver automatiquement la bonne clé
- * appareil même sans note/référence manuelle.
+ * ── Changement d'agrégateur : Djèko → SasPay ───────────────────────────────
+ * AVANT : chaque forfait ouvrait un lien de paiement STATIQUE Djèko, identique
+ * pour tous les clients. Il fallait donc pré-enregistrer une « intention de
+ * paiement » avec le numéro de téléphone du client, pour que le webhook puisse
+ * tenter de rattacher le paiement à un appareil (méthode fragile).
+ *
+ * APRÈS (SasPay) : la CLÉ APPAREIL est la seule identité d'achat. Elle est
+ * envoyée à la fonction serveur `create-checkout`, qui crée une session SasPay
+ * dynamique et l'inscrit dans la description + les métadonnées du paiement. Le
+ * webhook active donc exactement l'appareil qui a payé — sans aucun numéro de
+ * téléphone. Le numéro saisi ci-dessous ne sert plus qu'au formulaire de
+ * paiement SasPay (le payeur doit être joignable par son opérateur mobile money).
+ *
+ * Le vrai déblocage se fait uniquement côté serveur, après confirmation du
+ * paiement (webhook SasPay, avec `check-payment` en filet de sécurité).
  */
 class SubscriptionActivity : AppCompatActivity() {
 
@@ -43,6 +54,7 @@ class SubscriptionActivity : AppCompatActivity() {
     private lateinit var inputPhone: EditText
     private lateinit var deviceKey: String
     private val tvPrimaryActionButtons = mutableListOf<View>()
+    private var currentIntentId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,7 +79,7 @@ class SubscriptionActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
         }
         val subtitle = TextView(this).apply {
-            text = "Paiement sécurisé. Votre accès s'active tout seul, dès que le paiement est confirmé."
+            text = "Paiement sécurisé via SasPay. Votre accès s'active tout seul, dès que le paiement est confirmé."
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
             textSize = 13f
             gravity = Gravity.CENTER
@@ -90,15 +102,9 @@ class SubscriptionActivity : AppCompatActivity() {
             ).apply { bottomMargin = dp(18) }
         }
         autoBlock.addView(TextView(this).apply {
-            text = "💡 Astuce : payez avec le même numéro que celui écrit dans le champ \"Téléphone\" ci-dessous. Votre abonnement s'activera automatiquement, sans rien faire d'autre."
+            text = "💡 Clé de votre appareil (pré-remplie, à ne pas modifier). Elle identifie votre paiement : c'est avec elle que votre accès sera débloqué automatiquement."
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
             textSize = 12f
-        })
-        autoBlock.addView(TextView(this).apply {
-            text = "Si jamais l'activation ne se fait pas automatiquement, envoyez ce code à votre revendeur :"
-            setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
-            textSize = 12f
-            setPadding(0, dp(10), 0, 0)
         })
         autoBlock.addView(TextView(this).apply {
             text = deviceKey
@@ -107,16 +113,13 @@ class SubscriptionActivity : AppCompatActivity() {
             setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
             setPadding(0, dp(6), 0, dp(2))
         })
+        autoBlock.addView(TextView(this).apply {
+            text = "Si l'activation automatique ne se fait pas, envoyez ce code à votre revendeur :"
+            setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
+            textSize = 12f
+            setPadding(0, dp(8), 0, 0)
+        })
         formStep.addView(autoBlock)
-
-        val infoTitle = TextView(this).apply {
-            text = "Vos informations"
-            setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_primary))
-            textSize = 16f
-            setTypeface(typeface, Typeface.BOLD)
-            setPadding(0, 0, 0, dp(4))
-        }
-        formStep.addView(infoTitle)
 
         inputFirstName = buildInputField("Prénom", dp = ::dp)
         inputLastName = buildInputField("Nom", dp = ::dp)
@@ -294,7 +297,7 @@ class SubscriptionActivity : AppCompatActivity() {
         })
 
         val payButton = Button(this).apply {
-            text = "Payer"
+            text = "Payer en ligne"
             isAllCaps = false
             isFocusable = true
             isFocusableInTouchMode = true
@@ -315,28 +318,6 @@ class SubscriptionActivity : AppCompatActivity() {
 
         card.addView(textCol)
         card.addView(payButton)
-
-        if (runningOnTv) {
-            val qrButton = Button(this).apply {
-                text = "📱"
-                textSize = 18f
-                isAllCaps = false
-                isFocusable = true
-                isFocusableInTouchMode = true
-                setPadding(dp(14), dp(10), dp(14), dp(10))
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { marginStart = dp(8) }
-            }
-            applyActionButtonStyle(qrButton, focused = false, primary = false, dp = dp)
-            qrButton.setOnClickListener { showPaymentQrDialog(plan, deviceKey, dp = dp) }
-            qrButton.setOnFocusChangeListener { _, hasFocus ->
-                applyActionButtonStyle(qrButton, hasFocus, primary = false, dp = dp)
-                card.post { applyCardFocusStyle(card, card.hasFocus(), dp) }
-            }
-            card.addView(qrButton)
-        }
 
         return card
     }
@@ -376,56 +357,17 @@ class SubscriptionActivity : AppCompatActivity() {
         button.elevation = if (focused) dp(4).toFloat() else 0f
     }
 
-    private fun showPaymentQrDialog(plan: SubscriptionPlan, deviceKey: String, dp: (Int) -> Int) {
-        val url = plan.djekoPaymentUrl
-        if (url.isNullOrBlank()) {
-            Toast.makeText(this, "Paiement indisponible pour le moment. Contactez le revendeur via WhatsApp.", Toast.LENGTH_LONG).show()
-            return
-        }
-        val qrBitmap = QrCodeGenerator.generate(url, sizePx = 512)
-        if (qrBitmap == null) {
-            Toast.makeText(this, "Impossible de générer le QR code.", Toast.LENGTH_LONG).show()
-            return
-        }
-
-        val container = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(20), dp(12), dp(20), dp(4))
-        }
-        container.addView(ImageView(this).apply {
-            setImageBitmap(qrBitmap)
-            layoutParams = LinearLayout.LayoutParams(dp(220), dp(220))
-        })
-        container.addView(TextView(this).apply {
-            text = "Scannez avec l'appareil photo de votre téléphone pour payer avec Wave, Orange Money, MTN Money, Moov, Djamo ou carte bancaire."
-            setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
-            textSize = 13f
-            gravity = Gravity.CENTER
-            setPadding(0, dp(14), 0, dp(4))
-        })
-        container.addView(TextView(this).apply {
-            text = "Pour que ça s'active tout seul, payez avec ce même numéro que celui écrit dans le champ \"Téléphone\" sur la TV."
-            setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
-            textSize = 12f
-            gravity = Gravity.CENTER
-            setPadding(0, dp(10), 0, dp(2))
-        })
-        container.addView(TextView(this).apply {
-            text = "Si ça ne marche pas tout seul, envoyez ce code à votre revendeur : $deviceKey"
-            setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_orange))
-            textSize = 13f
-            setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
-            gravity = Gravity.CENTER
-        })
-
-        AlertDialog.Builder(this)
-            .setTitle("${plan.durationLabel} — ${plan.priceLabel}")
-            .setView(container)
-            .setPositiveButton("Fermer", null)
-            .show()
-    }
-
+    /**
+     * Lance le paiement SasPay pour le forfait choisi.
+     *
+     * 1. la fonction serveur crée la session de paiement (clé appareil incluse) ;
+     * 2. la page de paiement SasPay s'ouvre dans le WebView intégré (le client
+     *    choisit son réseau : Wave, Orange Money, MTN, Moov, Djamo, carte) ;
+     * 3. l'écran interroge périodiquement le serveur : dès que le paiement est
+     *    confirmé, la licence de cet appareil est activée et l'utilisateur peut
+     *    appuyer sur « Vérifier mon activation » (ou revenir : la vérification
+     *    automatique de LicenseActivity le fera toute seule).
+     */
     private fun startPayment(
         plan: SubscriptionPlan,
         deviceKey: String,
@@ -446,41 +388,53 @@ class SubscriptionActivity : AppCompatActivity() {
         progress.visibility = View.VISIBLE
 
         lifecycleScope.launch {
-            val registration = PaymentIntentRegistrar.registerIntent(
-                context = this@SubscriptionActivity,
-                plan = plan,
+            val result = SaspayPaymentClient.createCheckout(
+                deviceKey = deviceKey,
+                planId = plan.id,
                 firstName = firstName,
                 lastName = lastName,
                 email = email,
                 phone = phone
             )
 
-            if (!registration.success) {
-                progress.visibility = View.GONE
-                button.isEnabled = true
-                Toast.makeText(this@SubscriptionActivity, registration.message, Toast.LENGTH_LONG).show()
-                return@launch
-            }
-
-            val result = DjekoPaymentClient.getPaymentUrl(plan, deviceKey)
-
             progress.visibility = View.GONE
             button.isEnabled = true
 
-            if (result == null) {
+            if (result.checkoutUrl == null) {
                 Toast.makeText(
                     this@SubscriptionActivity,
-                    "Paiement indisponible pour le moment. Contactez le revendeur via WhatsApp.",
+                    result.error ?: "Paiement indisponible pour le moment. Contactez le revendeur via WhatsApp.",
                     Toast.LENGTH_LONG
                 ).show()
                 return@launch
             }
 
+            currentIntentId = result.intentId
             startActivity(
                 Intent(this@SubscriptionActivity, PaymentWebViewActivity::class.java).apply {
-                    putExtra(PaymentWebViewActivity.EXTRA_PAYMENT_URL, result.paymentUrl)
+                    putExtra(PaymentWebViewActivity.EXTRA_PAYMENT_URL, result.checkoutUrl)
                 }
             )
+
+            // Filet de sécurité : tant que cet écran est affiché, on vérifie
+            // toutes les 5 secondes si le paiement est passé (au cas où le
+            // webhook serait retardé ou perdu). Dès que c'est confirmé, la
+            // licence de cet appareil est activée et on passe à l'application.
+            while (true) {
+                delay(5_000)
+                val status = SaspayPaymentClient.checkPayment(deviceKey, currentIntentId)
+                if (status.activated) {
+                    TrialManager.checkOnlineLicense(this@SubscriptionActivity)
+                    Toast.makeText(
+                        this@SubscriptionActivity,
+                        "Paiement confirmé ! Votre abonnement est activé.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    startActivity(Intent(this@SubscriptionActivity, PlaylistActivity::class.java))
+                    finish()
+                    break
+                }
+            }
         }
     }
 

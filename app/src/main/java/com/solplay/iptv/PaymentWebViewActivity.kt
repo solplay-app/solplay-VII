@@ -10,14 +10,14 @@ import android.widget.ProgressBar
 import androidx.appcompat.app.AppCompatActivity
 
 /**
- * Ouvre la page de paiement Djèko (Jeko) dans un WebView intégré à l'app.
+ * Ouvre la page de paiement SasPay dans un WebView intégré à l'app.
  *
  * Ne fait AUCUNE hypothèse sur "quand le paiement est terminé" - pas de
  * détection d'URL de retour pour débloquer quoi que ce soit côté app
- * (ce serait non sécurisé, voir DjekoPaymentClient.kt). L'utilisateur
+ * (ce serait non sécurisé, voir SaspayPaymentClient.kt). L'utilisateur
  * ferme cet écran une fois le paiement fait (bouton retour), et retombe
  * sur LicenseActivity, qui détecte l'activation réelle automatiquement dès
- * que le webhook Djèko l'aura confirmée côté Firebase (LiveLicenseWatcher/
+ * que le webhook SasPay (ou check-payment) l'aura confirmée côté Firebase (LiveLicenseWatcher/
  * sondage 10s déjà en place).
  */
 class PaymentWebViewActivity : AppCompatActivity() {
