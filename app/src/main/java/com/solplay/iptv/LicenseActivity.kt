@@ -7,7 +7,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
-import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -40,25 +39,17 @@ class LicenseActivity : AppCompatActivity() {
         }
 
         val deviceKey = DeviceKeyManager.getDeviceKey(this)
-        // IMPORTANT : la clé est désormais affichée TELLE QUELLE, sans préfixe
-        // "SP-" — l'ancien serveur exigeait "SP-XXXXXXXX" mais DeviceKeyManager
-        // produit une clé HEX 16 caractères (UUID tronqué). Le format attendu
-        // par SasPay / l'admin a été aligné sur ce nouveau format.
-        binding.tvDeviceKey.text = deviceKey
-        binding.tvDeviceKeyInOverlay.text = deviceKey
-
-        // Pré-charge aussi le QR code en bitmap (utilisé par l'overlay) :
-        QrCodeGenerator.generateForDeviceKey(deviceKey)?.let { qr ->
-            binding.ivDeviceKeyQr.setImageBitmap(qr)
-        }
-
-        // Bloc contact / support : affiché SOUS le bloc central (et non plus
-        // tout en bas).
-        binding.tvContactEmail.text = getString(R.string.contact_email)
-        binding.tvContactPhone.text = getString(R.string.contact_phone)
+        binding.tvDeviceKey.text = getString(R.string.device_key_format, deviceKey)
 
         refreshUiState()
 
+        // Revérifie automatiquement auprès de Firebase à l'ouverture de l'écran,
+        // puis en continu toutes les 10 secondes tant que cet écran est affiché
+        // (en plus du bouton "Vérifier mon activation"), pour détecter
+        // automatiquement l'activation faite par l'admin sans que
+        // l'utilisateur ait besoin d'appuyer sur un bouton ou de relancer
+        // l'application : dès que l'admin active la clé, l'écran bascule
+        // seul vers l'interface normale.
         lifecycleScope.launch {
             while (true) {
                 val active = TrialManager.checkOnlineLicense(this@LicenseActivity)
@@ -71,36 +62,25 @@ class LicenseActivity : AppCompatActivity() {
             }
         }
 
+        // Se met à jour chaque minute tant que l'écran est affiché, au lieu de
+        // rester figé sur la valeur calculée à l'ouverture de l'écran.
         LiveCountdown.attach(this) { refreshUiState() }
 
         binding.btnContinueTrial.setOnClickListener {
             goToApp()
         }
 
-        // ══════════ Bouton « afficher le code » ══════════
-        // Affiche l'overlay centré plein écran avec QR + clé. Toucher n'importe
-        // où ailleurs ferme l'overlay.
-        binding.btnShowCode.setOnClickListener {
-            binding.qrOverlay.visibility = View.VISIBLE
-        }
-        binding.qrOverlay.setOnClickListener {
-            binding.qrOverlay.visibility = View.GONE
-        }
-
-        // ══════════ Bouton « Copier » ══════════
-        // Remplace l'ancien TextView long à sélection manuelle : un bouton
-        // court qui copie la clé dans le presse-papier et confirme par toast.
         binding.btnCopyDeviceKey.setOnClickListener {
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             clipboard.setPrimaryClip(ClipData.newPlainText("Clé appareil SolPlay", deviceKey))
-            Toast.makeText(this, "Clé copiée dans le presse-papier", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Clé copiée !", Toast.LENGTH_SHORT).show()
         }
 
         binding.btnVerifyActivation.setOnClickListener {
-            binding.progressBarLicense.visibility = View.VISIBLE
+            binding.progressBarLicense.visibility = android.view.View.VISIBLE
             lifecycleScope.launch {
                 val active = TrialManager.checkOnlineLicense(this@LicenseActivity)
-                binding.progressBarLicense.visibility = View.GONE
+                binding.progressBarLicense.visibility = android.view.View.GONE
                 refreshUiState()
                 if (active) {
                     Toast.makeText(this@LicenseActivity, R.string.license_success, Toast.LENGTH_LONG).show()
@@ -118,8 +98,23 @@ class LicenseActivity : AppCompatActivity() {
         binding.btnPayOnline.setOnClickListener {
             startActivity(Intent(this, SubscriptionActivity::class.java))
         }
+
+        // CORRECTIF (demande client, écran figé) : le QR code n'est plus
+        // affiché en permanence sur l'écran (il prenait trop de place et
+        // forçait à défiler). Il s'ouvre désormais au milieu de l'écran, dans
+        // une boîte de dialogue, quand on appuie sur "Afficher QR code" en
+        // haut de l'écran - et se ferme d'un clic dessus.
+        binding.btnShowQr.setOnClickListener {
+            showDeviceKeyQrDialog(deviceKey)
+        }
     }
 
+    /**
+     * Met à jour l'affichage selon l'état actuel :
+     * - Licence Pro active -> date/heure d'expiration + temps restant
+     * - Essai gratuit actif -> temps restant (heures/minutes)
+     * - Ni l'un ni l'autre -> écran bloqué avec message + bouton WhatsApp
+     */
     private fun refreshUiState() {
         val licensed = TrialManager.isLicensed(this)
         val trialActive = TrialManager.isTrialActive(this)
@@ -137,8 +132,8 @@ class LicenseActivity : AppCompatActivity() {
                         TrialManager.formatDuration(remaining)
                     )
                 }
-                binding.btnContinueTrial.visibility = View.VISIBLE
-                binding.groupBlocked.visibility = View.GONE
+                binding.btnContinueTrial.visibility = android.view.View.VISIBLE
+                binding.groupBlocked.visibility = android.view.View.GONE
             }
             trialActive -> {
                 val remaining = TrialManager.getRemainingTrialMillis(this)
@@ -146,17 +141,27 @@ class LicenseActivity : AppCompatActivity() {
                     R.string.trial_active_format,
                     TrialManager.formatDuration(remaining)
                 )
-                binding.btnContinueTrial.visibility = View.VISIBLE
-                binding.groupBlocked.visibility = View.GONE
+                binding.btnContinueTrial.visibility = android.view.View.VISIBLE
+                binding.groupBlocked.visibility = android.view.View.GONE
             }
             else -> {
+                // Essai (24h) ET licence expirés : on bloque l'accès à l'application.
                 binding.tvStatus.text = getString(R.string.trial_expired_title)
-                binding.btnContinueTrial.visibility = View.GONE
-                binding.groupBlocked.visibility = View.VISIBLE
+                binding.btnContinueTrial.visibility = android.view.View.GONE
+                binding.groupBlocked.visibility = android.view.View.VISIBLE
             }
         }
     }
 
+    /**
+     * Ouvre une conversation WhatsApp avec le revendeur. Le numéro n'est
+     * jamais affiché comme texte à l'écran : il n'existe que dans ce lien.
+     *
+     * Sur téléphone/tablette : ouverture directe de WhatsApp (comportement
+     * inchangé). Sur TV/Box : WhatsApp n'est généralement pas installé, et
+     * la télécommande ne permet de toute façon pas de taper un message -
+     * on affiche donc un QR code du même lien, à scanner avec un téléphone.
+     */
     private fun openWhatsAppContact(deviceKey: String) {
         val phone = getString(R.string.whatsapp_phone_international)
         val message = Uri.encode(
@@ -176,6 +181,12 @@ class LicenseActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Affiche le lien WhatsApp du revendeur sous forme de QR code (construit
+     * en code plutôt que via un layout XML séparé, pour un dialogue aussi
+     * simple). L'utilisateur scanne avec l'appareil photo de son téléphone,
+     * qui ouvre directement la conversation WhatsApp pré-remplie.
+     */
     private fun showWhatsAppQrDialog(content: String) {
         val qrBitmap = QrCodeGenerator.generate(content, sizePx = 640)
         if (qrBitmap == null) {
@@ -207,6 +218,59 @@ class LicenseActivity : AppCompatActivity() {
             .setView(container)
             .setPositiveButton("Fermer", null)
             .show()
+    }
+
+    /**
+     * Affiche le QR code de la clé appareil au milieu de l'écran, dans une
+     * boîte de dialogue (demande client) : ouverte via le bouton "Afficher
+     * QR code" en haut de l'écran, et fermée d'un simple clic dessus - sans
+     * bouton "Fermer" séparé, comme demandé.
+     */
+    private fun showDeviceKeyQrDialog(deviceKey: String) {
+        val qrBitmap = QrCodeGenerator.generateForDeviceKey(deviceKey)
+        if (qrBitmap == null) {
+            Toast.makeText(this, "Impossible de générer le QR code.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val padding = (24 * resources.displayMetrics.density).toInt()
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(padding, padding, padding, padding)
+        }
+        val title = TextView(this).apply {
+            text = "Scannez ce QR code avec l'application admin pour envoyer votre clé au revendeur"
+            gravity = Gravity.CENTER
+            textSize = 15f
+            setPadding(0, 0, 0, padding)
+        }
+        val qrSizePx = (240 * resources.displayMetrics.density).toInt()
+        val imageView = ImageView(this).apply {
+            setImageBitmap(qrBitmap)
+            layoutParams = LinearLayout.LayoutParams(qrSizePx, qrSizePx)
+        }
+        val hint = TextView(this).apply {
+            text = "Touchez le QR code pour fermer"
+            gravity = Gravity.CENTER
+            textSize = 12f
+            setPadding(0, padding, 0, 0)
+        }
+        container.addView(title)
+        container.addView(imageView)
+        container.addView(hint)
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(container)
+            .create()
+
+        // Clic sur le QR code lui-même (ou son conteneur) pour fermer, sans
+        // bouton "Fermer" séparé : c'est exactement ce qui a été demandé.
+        val closeOnClick = android.view.View.OnClickListener { dialog.dismiss() }
+        imageView.setOnClickListener(closeOnClick)
+        container.setOnClickListener(closeOnClick)
+
+        dialog.show()
     }
 
     private fun goToApp() {
