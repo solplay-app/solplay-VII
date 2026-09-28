@@ -1,7 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Enveloppé dans un ScrollView (fillViewport) : ce même écran (statut licence,
+     clé appareil, boutons QR/renouvellement, contact) peut dépasser la
+     hauteur visible sur un petit écran, une police système agrandie, ou une
+     résolution différente. Sans défilement, "Contact / Achat version Pro"
+     (email + téléphone, tout en bas) se retrouvait coupé et inatteignable -
+     même correctif que licenseActivity et l'application Windows. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fillViewport="true">
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="24dp"
     android:background="@color/solplay_bg_dark">
@@ -130,3 +141,4 @@
         android:textColor="@color/solplay_text_primary_dark" />
 
 </LinearLayout>
+</ScrollView>

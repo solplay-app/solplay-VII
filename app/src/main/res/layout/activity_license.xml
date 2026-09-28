@@ -1,13 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    CORRECTIF (demande client) : écran figé, sans défilement.
+    CORRECTIF (demande client) : écran figé, sans défilement... mais avec un
+    filet de sécurité (ScrollView + fillViewport) ajouté ensuite : sur un
+    écran plus petit, une police système agrandie (accessibilité), ou une
+    résolution/mise à l'échelle différente, le contenu ci-dessous (état
+    bloqué + bouton WhatsApp + Payer en ligne + contact + clé appareil +
+    Vérifier mon activation) peut dépasser la hauteur visible. Sans
+    ScrollView, Android ne redimensionne rien tout seul : les derniers
+    éléments (bouton "Vérifier mon activation", parfois même la clé
+    appareil) se retrouvaient simplement coupés hors écran, inatteignables -
+    exactement le même bug que celui corrigé côté application Windows. Le
+    ScrollView ne change RIEN à l'apparence sur un écran où tout tient déjà
+    (fillViewport laisse alors le contenu occupé toute la hauteur, avec
+    l'espaceur ci-dessous qui pousse la clé appareil en bas comme avant) ;
+    il ne devient actif que si le contenu ne rentre pas.
 
     Avant : ScrollView + LinearLayout, avec la clé appareil affichée en clair
     dans une grande zone de texte, un bouton "Copier" pleine largeur séparé,
     et le contact (email/téléphone) tout en bas de l'écran (invisible sans
     défiler). L'utilisateur devait défiler pour voir le reste de l'écran.
 
-    Après : tout tient sur un seul écran fixe (plus de ScrollView) :
+    Après : tout tient sur un seul écran fixe la plupart du temps (avec
+    filet de sécurité ScrollView pour les petits écrans) :
      - le bouton "Afficher le QR code" est en haut à droite (au lieu d'un QR
        toujours visible qui prenait de la place) : il ouvre le QR code dans
        une boîte de dialogue au milieu de l'écran, qu'on ferme en cliquant
@@ -17,9 +31,14 @@
      - la clé appareil n'est plus affichée dans un gros bloc de texte : une
        simple ligne "clé + bouton Copier" compacte la remplace.
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fillViewport="true">
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
     android:background="@color/solplay_bg_dark"
     android:orientation="vertical"
     android:paddingStart="20dp"
@@ -238,3 +257,4 @@
         android:visibility="gone" />
 
 </LinearLayout>
+</ScrollView>
