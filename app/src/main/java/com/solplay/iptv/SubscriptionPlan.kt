@@ -10,9 +10,9 @@ package com.solplay.iptv
  * le même pour tous les clients d'un même forfait, le serveur ne savait pas
  * quel appareil créditer : il devait deviner (numéro de téléphone du payeur).
  *
- * APRÈS : SasPay. Le paiement est créé DYNAMIQUEMENT pour chaque appareil via
- * la fonction serveur `create-checkout` (voir SaspayPaymentClient.kt), qui est
- * la seule à posséder la clé secrète SasPay. La clé appareil est envoyée à la
+ * APRÈS : l'agrégateur. Le paiement est créé DYNAMIQUEMENT pour chaque appareil via
+ * la fonction serveur `create-checkout` (voir OnlinePaymentClient.kt), qui est
+ * la seule à posséder la clé secrète de paiement. La clé appareil est envoyée à la
  * création de la session et se retrouve dans la description + les métadonnées
  * du paiement : le webhook active donc exactement l'appareil qui a payé.
  *
@@ -21,7 +21,7 @@ package com.solplay.iptv
  * facturé est appliqué côté serveur, ce qui interdit toute manipulation de prix.
  *
  * Doit rester synchronisé avec :
- *  - create-checkout.js / saspay-webhook.js (PLANS / PLAN_BY_AMOUNT)
+ *  - create-checkout.js / payment-webhook.js (PLANS / PLAN_BY_AMOUNT)
  *  - SolPlayPlans.kt (application Windows)
  */
 data class SubscriptionPlan(

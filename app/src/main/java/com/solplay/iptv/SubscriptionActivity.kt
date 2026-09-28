@@ -30,21 +30,21 @@ import kotlinx.coroutines.launch
 /**
  * Écran d'abonnement / paiement direct.
  *
- * ── Changement d'agrégateur : Djèko → SasPay ───────────────────────────────
+ * ── Changement d'agrégateur : Djèko → nouvel agrégateur ───────────────────────────────
  * AVANT : chaque forfait ouvrait un lien de paiement STATIQUE Djèko, identique
  * pour tous les clients. Il fallait donc pré-enregistrer une « intention de
  * paiement » avec le numéro de téléphone du client, pour que le webhook puisse
  * tenter de rattacher le paiement à un appareil (méthode fragile).
  *
- * APRÈS (SasPay) : la CLÉ APPAREIL est la seule identité d'achat. Elle est
- * envoyée à la fonction serveur `create-checkout`, qui crée une session SasPay
+ * APRÈS : la CLÉ APPAREIL est la seule identité d'achat. Elle est
+ * envoyée à la fonction serveur `create-checkout`, qui crée une session de paiement
  * dynamique et l'inscrit dans la description + les métadonnées du paiement. Le
  * webhook active donc exactement l'appareil qui a payé — sans aucun numéro de
  * téléphone. Le numéro saisi ci-dessous ne sert plus qu'au formulaire de
- * paiement SasPay (le payeur doit être joignable par son opérateur mobile money).
+ * paiement en ligne (le payeur doit être joignable par son opérateur mobile money).
  *
  * Le vrai déblocage se fait uniquement côté serveur, après confirmation du
- * paiement (webhook SasPay, avec `check-payment` en filet de sécurité).
+ * paiement (webhook de paiement, avec `check-payment` en filet de sécurité).
  */
 class SubscriptionActivity : AppCompatActivity() {
 
@@ -79,7 +79,7 @@ class SubscriptionActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
         }
         val subtitle = TextView(this).apply {
-            text = "Paiement sécurisé via SasPay. Votre accès s'active tout seul, dès que le paiement est confirmé."
+            text = "Paiement sécurisé. Votre accès s'active tout seul, dès que le paiement est confirmé."
             setTextColor(ContextCompat.getColor(this@SubscriptionActivity, R.color.solplay_text_on_light_secondary))
             textSize = 13f
             gravity = Gravity.CENTER
@@ -358,10 +358,10 @@ class SubscriptionActivity : AppCompatActivity() {
     }
 
     /**
-     * Lance le paiement SasPay pour le forfait choisi.
+     * Lance le paiement en ligne pour le forfait choisi.
      *
      * 1. la fonction serveur crée la session de paiement (clé appareil incluse) ;
-     * 2. la page de paiement SasPay s'ouvre dans le WebView intégré (le client
+     * 2. la page de paiement en ligne s'ouvre dans le WebView intégré (le client
      *    choisit son réseau : Wave, Orange Money, MTN, Moov, Djamo, carte) ;
      * 3. l'écran interroge périodiquement le serveur : dès que le paiement est
      *    confirmé, la licence de cet appareil est activée et l'utilisateur peut
@@ -388,7 +388,7 @@ class SubscriptionActivity : AppCompatActivity() {
         progress.visibility = View.VISIBLE
 
         lifecycleScope.launch {
-            val result = SaspayPaymentClient.createCheckout(
+            val result = OnlinePaymentClient.createCheckout(
                 deviceKey = deviceKey,
                 planId = plan.id,
                 firstName = firstName,
@@ -422,7 +422,7 @@ class SubscriptionActivity : AppCompatActivity() {
             // licence de cet appareil est activée et on passe à l'application.
             while (true) {
                 delay(5_000)
-                val status = SaspayPaymentClient.checkPayment(deviceKey, currentIntentId)
+                val status = OnlinePaymentClient.checkPayment(deviceKey, currentIntentId)
                 if (status.activated) {
                     TrialManager.checkOnlineLicense(this@SubscriptionActivity)
                     Toast.makeText(
